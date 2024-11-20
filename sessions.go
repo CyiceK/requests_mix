@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"crypto/md5"
 	"crypto/x509"
 	"encoding/binary"
 	"errors"
@@ -17,10 +18,12 @@ import (
 	ja3 "github.com/wangluozhe/requests/transport"
 	"github.com/wangluozhe/requests/url"
 	"github.com/wangluozhe/requests/utils"
+	"io"
 	"io/ioutil"
 	"log"
 	url2 "net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -133,9 +136,14 @@ var disableRedirect = func(request *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
+var (
+	DEFAULT_TRANSPORT *http.Transport // 默认 Transport
+	defineTransport   sync.Once
+)
+
 const (
 	DEFAULT_REDIRECT_LIMIT = 30 // 默认redirect最大次数
-	DEFAULT_TIMEOUT        = 10 // 默认client响应时间
+	DEFAULT_TIMEOUT        = 15 // 默认client响应时间
 )
 
 // 新建默认Session
@@ -151,14 +159,18 @@ func NewSession() *Session {
 	}
 	cookies, _ := cookiejar.New(nil)
 	session.Cookies = cookies
-	session.transport = &http.Transport{
-		TLSClientConfig: &utls.Config{
-			InsecureSkipVerify: session.Verify,
-			OmitEmptyPsk:       true,
-		},
-		DisableKeepAlives: false, // 这里问题很严重
-	}
-	session.request = &http.Request{}
+	defineTransport.Do(func() {
+		// Transports should be reused instead of created as needed.
+		// Transports are safe for concurrent use by multiple goroutines.
+		DEFAULT_TRANSPORT = &http.Transport{
+			TLSClientConfig: &utls.Config{
+				InsecureSkipVerify: session.Verify,
+				OmitEmptyPsk:       true,
+			},
+			DisableKeepAlives: false,
+		}
+	})
+	session.transport = DEFAULT_TRANSPORT
 	session.client = &http.Client{
 		Transport:     session.transport,
 		CheckRedirect: nil,
@@ -189,6 +201,7 @@ type Session struct {
 	transport     *http.Transport
 	request       *http.Request
 	client        *http.Client
+	ja3Hash       [16]byte
 }
 
 // 预请求处理
@@ -346,11 +359,16 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 			options.Proxy = proxies
 		}
 
-		client, err := ja3.NewClient(options)
-		if err != nil {
-			return nil, err
+		//指纹变更或者client为空才需要重建client
+		currentHash := md5.Sum([]byte(browser.JA3 + browser.UserAgent))
+		if s.ja3Hash != currentHash || s.client == nil {
+			client, err := ja3.NewClient(options)
+			if err != nil {
+				return nil, err
+			}
+			s.client = &client
+			s.ja3Hash = currentHash
 		}
-		s.client = &client
 	}
 
 	// 是否验证证书
@@ -463,16 +481,46 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 
 // 构建response参数
 func (s *Session) buildResponse(resp *http.Response, preq *models.PrepareRequest, req *url.Request) (*models.Response, error) {
+	stream := strings.Contains(resp.Header.Get("Content-Type"), "application/stream") ||
+		strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream")
+	encoding := resp.Header.Get("Content-Encoding")
+	if stream {
+		body := resp.Body
+		if encoding == "br" {
+			body = &struct {
+				io.Reader
+				io.Closer
+			}{brotli.NewReader(resp.Body), resp.Body}
+		}
+
+		response := &models.Response{
+			Url:        preq.Url,
+			Headers:    resp.Header,
+			Cookies:    resp.Cookies(),
+			Text:       "",
+			Content:    nil,
+			Body:       body,
+			StatusCode: resp.StatusCode,
+			History:    []*models.Response{},
+			Request:    req,
+		}
+		if resp.Cookies() != nil {
+			u, _ := url2.Parse(preq.Url)
+			s.Cookies.SetCookies(u, resp.Cookies())
+		}
+		return response, nil
+	}
+
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	encoding := resp.Header.Get("Content-Encoding")
+	//encoding := resp.Header.Get("Content-Encoding")
 	DecompressBody(&content, encoding)
-	body := ioutil.NopCloser(bytes.NewReader(content))
+	body := io.NopCloser(bytes.NewReader(content))
 	response := &models.Response{
 		Url:        preq.Url,
 		Headers:    resp.Header,
@@ -516,7 +564,7 @@ func decodeGZip(content *[]byte) error {
 		return err
 	}
 	defer r.Close()
-	*content, err = ioutil.ReadAll(r)
+	*content, err = io.ReadAll(r)
 	if err != nil {
 		return err
 	}
@@ -531,7 +579,7 @@ func decodeDeflate(content *[]byte) error {
 	}
 	r := flate.NewReader(bytes.NewReader(*content))
 	defer r.Close()
-	*content, err = ioutil.ReadAll(r)
+	*content, err = io.ReadAll(r)
 	if err != nil {
 		return err
 	}
@@ -545,7 +593,7 @@ func decodeBrotli(content *[]byte) error {
 		return err
 	}
 	r := brotli.NewReader(bytes.NewReader(*content))
-	*content, err = ioutil.ReadAll(r)
+	*content, err = io.ReadAll(r)
 	if err != nil {
 		return err
 	}
