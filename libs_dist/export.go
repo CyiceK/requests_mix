@@ -28,16 +28,27 @@ var unsafePointersLock = sync.Mutex{}
 var errorFormat = "{\"err\": \"%v\"}"
 
 var sessionsPool = make(map[string]*sync.Pool)
-var sessionsPoolLock = sync.Mutex{}
+var sessionsPoolLock = sync.RWMutex{}
 
 func GetSession(id string) *requests.Session {
-	sessionsPoolLock.Lock()
-	defer sessionsPoolLock.Unlock()
+	// lite lock
+	sessionsPoolLock.RLock()
+	defer sessionsPoolLock.RUnlock()
 	if sp, ok := sessionsPool[id]; ok {
 		s := sp.Get().(*requests.Session)
 		sp.Put(s)
 		return s
+	} else {
+		// heavy lock
+		sessionsPoolLock.Lock()
+		defer sessionsPoolLock.Unlock()
+		if sp, ok = sessionsPool[id]; ok {
+			s := sp.Get().(*requests.Session)
+			sp.Put(s)
+			return s
+		}
 	}
+
 	sp := &sync.Pool{
 		New: func() interface{} {
 			return requests.NewSession()
