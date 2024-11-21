@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // connectDialer allows to configure one-time use HTTP CONNECT transport
@@ -121,6 +122,7 @@ func (c *connectDialer) Dial(network, address string) (net.Conn, error) {
 			if err == nil {
 				return dialContext, nil
 			}
+			time.Sleep(time.Millisecond * time.Duration(i) * 100)
 		}
 		return nil, err
 	}
