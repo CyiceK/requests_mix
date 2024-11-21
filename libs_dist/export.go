@@ -39,6 +39,13 @@ func GetSession(id string) *requests.Session {
 
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
+	// heavy lock
+	if sp, ok := sessionsPool[id]; ok {
+		s := sp.Get().(*requests.Session)
+		sp.Put(s)
+		return s
+	}
+
 	sp := &sync.Pool{
 		New: func() interface{} {
 			return requests.NewSession()
