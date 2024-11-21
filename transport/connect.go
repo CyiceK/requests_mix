@@ -118,11 +118,11 @@ func (c *connectDialer) Dial(network, address string) (net.Conn, error) {
 	if err != nil && strings.Contains(err.Error(), "EOF") {
 		// retry 3 times
 		for i := 0; i < 3; i++ {
+			time.Sleep(time.Millisecond * time.Duration(i) * 100)
 			dialContext, err = c.DialContext(context.Background(), network, address)
 			if err == nil {
 				return dialContext, nil
 			}
-			time.Sleep(time.Millisecond * time.Duration(i) * 100)
 		}
 		return nil, err
 	}

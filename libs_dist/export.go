@@ -65,7 +65,19 @@ func request(requestParamsChar *C.char) *C.char {
 	}
 
 	response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req)
-	if err != nil {
+	if err != nil && strings.Contains(err.Error(), "EOF") {
+		// retry 3 times
+		for i := 0; i < 3; i++ {
+			time.Sleep(time.Millisecond * time.Duration(i) * 100)
+			response, err = GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req)
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			return C.CString(fmt.Sprintf(errorFormat, "request->response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req) failed: "+err.Error()))
+		}
+	} else if err != nil {
 		return C.CString(fmt.Sprintf(errorFormat, "request->response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req) failed: "+err.Error()))
 	}
 
