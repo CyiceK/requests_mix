@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -112,7 +113,18 @@ func newConnectDialer(proxyURLStr string, UserAgent string) (proxy.ContextDialer
 }
 
 func (c *connectDialer) Dial(network, address string) (net.Conn, error) {
-	return c.DialContext(context.Background(), network, address)
+	dialContext, err := c.DialContext(context.Background(), network, address)
+	if err != nil && strings.Contains(err.Error(), "EOF") {
+		// retry 3 times
+		for i := 0; i < 3; i++ {
+			dialContext, err = c.DialContext(context.Background(), network, address)
+			if err == nil {
+				return dialContext, nil
+			}
+		}
+		return nil, err
+	}
+	return dialContext, err
 }
 
 // ContextKeyHeader Users of context.WithValue should define their own types for keys
