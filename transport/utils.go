@@ -2,10 +2,11 @@ package transport
 
 import (
 	"crypto/sha256"
+	"errors"
+	utls "github.com/refraction-networking/utls"
+	"math/rand/v2"
 	"strconv"
 	"strings"
-
-	utls "github.com/refraction-networking/utls"
 )
 
 const (
@@ -33,7 +34,35 @@ func StringToSpec(ja3 string, userAgent string, tlsExtensions *TLSExtensions, fo
 	}
 	ext := tlsExtensions
 	extMap := genMap()
+
+	if ja3 == "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,65281-65037-17513-11-27-43-45-51-13-18-35-5-0-23-10-16-21,29-23-24,0" {
+		randJa3 := "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,"
+		tableExtensions := strings.Split("65281-65037-17513-11-27-43-45-51-13-18-35-5-0-23-10-16", "-")
+		//rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(tableExtensions), func(i, j int) {
+			tableExtensions[i], tableExtensions[j] = tableExtensions[j], tableExtensions[i]
+		})
+		for _, e := range tableExtensions {
+			randJa3 += e
+			randJa3 += "-"
+		}
+		if 1 == rand.IntN(100)%2 {
+			randJa3 += "21"
+		} else {
+			randJa3 = randJa3[:len(randJa3)-1]
+		}
+		randJa3 += ",29-23-24,0"
+		ja3 = randJa3
+	}
+
 	tokens := strings.Split(ja3, ",")
+
+	if len(tokens) == 0 {
+		return nil, errors.New("empty ja3 string")
+	}
+	if len(tokens) == 4 {
+		tokens = append(tokens, "0")
+	}
 
 	version := tokens[0]
 	ciphers := strings.Split(tokens[1], "-")
