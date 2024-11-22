@@ -84,7 +84,7 @@ func (res Response) Ok() bool {
 func (res Response) IsRedirect() bool {
 	// True if this Response is a well-formed HTTP redirect that could have
 	// been processed automatically (by :meth:`Session.resolve_redirects`).
-	if res.Headers.Get("locaion") == "" || inRedirectStatusCodes(res.StatusCode) {
+	if res.Headers.Get("location") == "" || inRedirectStatusCodes(res.StatusCode) {
 		return false
 	}
 	return true
@@ -92,7 +92,7 @@ func (res Response) IsRedirect() bool {
 
 func (res Response) IsPermanentRedirect() bool {
 	// True if this Response one of the permanent versions of redirect.
-	if res.Headers.Get("locaion") == "" || inPermanentRedirectStatusCodes(res.StatusCode) {
+	if res.Headers.Get("location") == "" || inPermanentRedirectStatusCodes(res.StatusCode) {
 		return false
 	}
 	return true
