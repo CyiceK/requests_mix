@@ -19,9 +19,9 @@ import (
 	"github.com/wangluozhe/requests/url"
 	"github.com/wangluozhe/requests/utils"
 	"io"
-	"io/ioutil"
 	"log"
 	url2 "net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -385,9 +385,9 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 			return nil, err
 		}
 		if len(cert) == 3 {
-			cert_byte, err = ioutil.ReadFile(cert[2])
+			cert_byte, err = os.ReadFile(cert[2])
 		} else {
-			cert_byte, err = ioutil.ReadFile(cert[0])
+			cert_byte, err = os.ReadFile(cert[0])
 		}
 		if err != nil {
 			return nil, err
@@ -398,7 +398,7 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 			return nil, errors.New("failed to parse root certificate")
 		}
 		s.transport.TLSClientConfig.RootCAs = certPool
-		fmt.Println(certs)
+		//fmt.Println(certs)
 		s.transport.TLSClientConfig.Certificates = []utls.Certificate{certs}
 	}
 
@@ -406,6 +406,11 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 	timeout := req.Timeout
 	if timeout != 0 {
 		s.client.Timeout = timeout
+	}
+
+	// http1无需保活
+	if req.ForceHTTP1 {
+		req.Headers.Set("Connection", "close")
 	}
 
 	// 是否自动转发
