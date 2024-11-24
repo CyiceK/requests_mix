@@ -14,6 +14,7 @@ import (
 	"github.com/wangluozhe/chttp"
 	"github.com/wangluozhe/chttp/cookiejar"
 	"github.com/wangluozhe/chttp/http2"
+	"github.com/wangluozhe/requests/libs"
 	"github.com/wangluozhe/requests/models"
 	ja3 "github.com/wangluozhe/requests/transport"
 	"github.com/wangluozhe/requests/url"
@@ -147,12 +148,18 @@ const (
 )
 
 // 新建默认Session
-func NewSession() *Session {
+func NewSession(req *libs.RequestParams) *Session {
+	DefaultTimeout := DEFAULT_TIMEOUT
+	DefaultRedirectLimit := DEFAULT_REDIRECT_LIMIT
+	if req == nil {
+	} else {
+		DefaultTimeout = req.Timeout
+	}
 	session := &Session{
 		Headers:      default_headers(),
 		Cookies:      nil,
 		Verify:       true,
-		MaxRedirects: DEFAULT_REDIRECT_LIMIT,
+		MaxRedirects: DefaultRedirectLimit,
 		transport:    nil,
 		request:      nil,
 		client:       nil,
@@ -167,7 +174,7 @@ func NewSession() *Session {
 				InsecureSkipVerify: session.Verify,
 				OmitEmptyPsk:       true,
 			},
-			IdleConnTimeout:   2 * DEFAULT_TIMEOUT * time.Second,
+			IdleConnTimeout:   2 * time.Duration(DefaultTimeout) * time.Second,
 			DisableKeepAlives: false,
 		}
 	})
@@ -176,14 +183,14 @@ func NewSession() *Session {
 		Transport:     session.transport,
 		CheckRedirect: nil,
 		Jar:           cookies,
-		Timeout:       DEFAULT_TIMEOUT * time.Second,
+		Timeout:       time.Duration(DefaultTimeout) * time.Second,
 	}
 	return session
 }
 
 // 新建默认Session，同上一模一样
 func DefaultSession() *Session {
-	return NewSession()
+	return NewSession(nil)
 }
 
 // Session结构体

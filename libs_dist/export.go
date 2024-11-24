@@ -30,8 +30,8 @@ var errorFormat = "{\"err\": \"%v\"}"
 var sessionsPool = make(map[string]*sync.Pool)
 var sessionsPoolLock = sync.Mutex{}
 
-func GetSession(id string) *requests.Session {
-	if sp, ok := sessionsPool[id]; ok {
+func GetSession(req libs.RequestParams) *requests.Session {
+	if sp, ok := sessionsPool[req.Id]; ok {
 		s := sp.Get().(*requests.Session)
 		sp.Put(s)
 		return s
@@ -40,7 +40,7 @@ func GetSession(id string) *requests.Session {
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
 	// heavy lock
-	if sp, ok := sessionsPool[id]; ok {
+	if sp, ok := sessionsPool[req.Id]; ok {
 		s := sp.Get().(*requests.Session)
 		sp.Put(s)
 		return s
@@ -48,12 +48,12 @@ func GetSession(id string) *requests.Session {
 
 	sp := &sync.Pool{
 		New: func() interface{} {
-			s := requests.NewSession()
+			s := requests.NewSession(&req)
 			s.Headers = url.NewHeaders()
 			return s
 		},
 	}
-	sessionsPool[id] = sp
+	sessionsPool[req.Id] = sp
 	s := sp.Get().(*requests.Session)
 	sp.Put(s)
 	return s
@@ -73,12 +73,12 @@ func request(requestParamsChar *C.char) *C.char {
 		return C.CString(fmt.Sprintf(errorFormat, "request->req, err := buildRequest(requestParams) failed: "+err.Error()))
 	}
 
-	response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req)
+	response, err := GetSession(requestParams).Request(requestParams.Method, requestParams.Url, req)
 	if err != nil && strings.Contains(err.Error(), "EOF") {
 		// retry 3 times
 		for i := 0; i < 3; i++ {
 			time.Sleep(time.Millisecond * time.Duration(i) * 100)
-			response, err = GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req)
+			response, err = GetSession(requestParams).Request(requestParams.Method, requestParams.Url, req)
 			if err == nil {
 				break
 			}

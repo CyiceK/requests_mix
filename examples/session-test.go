@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	session := requests.NewSession()
+	session := requests.NewSession(nil)
 	response, err := session.Get("https://ipinfo.io", nil)
 	if err != nil {
 		fmt.Println(err)

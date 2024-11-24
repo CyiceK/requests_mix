@@ -7,7 +7,7 @@ import (
 )
 
 func Request(method, rawurl string, req *url.Request) (*models.Response, error) {
-	session := NewSession()
+	session := NewSession(nil)
 	return session.Request(method, rawurl, req)
 }
 
