@@ -17,6 +17,7 @@ import (
 	"github.com/wangluozhe/requests/url"
 	"github.com/wangluozhe/requests/utils"
 	url2 "net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ var sessionsPoolLock = sync.Mutex{}
 var DEFAULT_TIMEOUT = 15 // 默认client响应时间
 
 func GetSession(req libs.RequestParams) *requests.Session {
-	if sp, ok := sessionsPool[req.Id]; ok {
+	if sp, ok := sessionsPool[req.Id+strconv.Itoa(req.Timeout)]; ok {
 		s := sp.Get().(*requests.Session)
 		sp.Put(s)
 		return s
@@ -42,7 +43,7 @@ func GetSession(req libs.RequestParams) *requests.Session {
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
 	// heavy lock
-	if sp, ok := sessionsPool[req.Id]; ok {
+	if sp, ok := sessionsPool[req.Id+strconv.Itoa(req.Timeout)]; ok {
 		s := sp.Get().(*requests.Session)
 		sp.Put(s)
 		return s
@@ -55,7 +56,7 @@ func GetSession(req libs.RequestParams) *requests.Session {
 			return s
 		},
 	}
-	sessionsPool[req.Id] = sp
+	sessionsPool[req.Id+strconv.Itoa(req.Timeout)] = sp
 	s := sp.Get().(*requests.Session)
 	sp.Put(s)
 	return s
