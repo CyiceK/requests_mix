@@ -14,7 +14,6 @@ import (
 	"github.com/wangluozhe/chttp"
 	"github.com/wangluozhe/chttp/cookiejar"
 	"github.com/wangluozhe/chttp/http2"
-	"github.com/wangluozhe/requests/libs"
 	"github.com/wangluozhe/requests/models"
 	ja3 "github.com/wangluozhe/requests/transport"
 	"github.com/wangluozhe/requests/url"
@@ -147,22 +146,19 @@ const (
 	DEFAULT_TIMEOUT        = 15 // 默认client响应时间
 )
 
-// 新建默认Session
-func NewSession(req *libs.RequestParams) *Session {
+// NewSession 新建默认Session
+func NewSession() *Session {
 	DefaultTimeout := DEFAULT_TIMEOUT
 	DefaultRedirectLimit := DEFAULT_REDIRECT_LIMIT
-	if req == nil {
-	} else {
-		DefaultTimeout = req.Timeout
-	}
 	session := &Session{
-		Headers:      default_headers(),
-		Cookies:      nil,
-		Verify:       true,
-		MaxRedirects: DefaultRedirectLimit,
-		transport:    nil,
-		request:      nil,
-		client:       nil,
+		Headers:        default_headers(),
+		Cookies:        nil,
+		Verify:         true,
+		MaxRedirects:   DefaultRedirectLimit,
+		transport:      nil,
+		request:        nil,
+		client:         nil,
+		TimeoutPointer: &DefaultTimeout,
 	}
 	cookies, _ := cookiejar.New(nil)
 	session.Cookies = cookies
@@ -174,7 +170,7 @@ func NewSession(req *libs.RequestParams) *Session {
 				InsecureSkipVerify: session.Verify,
 				OmitEmptyPsk:       true,
 			},
-			IdleConnTimeout:   2 * time.Duration(DefaultTimeout) * time.Second,
+			IdleConnTimeout:   2 * time.Duration(*session.TimeoutPointer) * time.Second,
 			DisableKeepAlives: false,
 		}
 	})
@@ -183,14 +179,14 @@ func NewSession(req *libs.RequestParams) *Session {
 		Transport:     session.transport,
 		CheckRedirect: nil,
 		Jar:           cookies,
-		Timeout:       time.Duration(DefaultTimeout) * time.Second,
+		Timeout:       time.Duration(*session.TimeoutPointer) * time.Second,
 	}
 	return session
 }
 
 // 新建默认Session，同上一模一样
 func DefaultSession() *Session {
-	return NewSession(nil)
+	return NewSession()
 }
 
 // Session结构体
@@ -210,6 +206,8 @@ type Session struct {
 	request       *http.Request
 	client        *http.Client
 	ja3Hash       [16]byte
+
+	TimeoutPointer *int
 }
 
 // 预请求处理

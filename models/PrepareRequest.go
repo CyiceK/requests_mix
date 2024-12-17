@@ -10,7 +10,6 @@ import (
 	"github.com/wangluozhe/requests/url"
 	"github.com/wangluozhe/requests/utils"
 	"io"
-	"io/ioutil"
 	"strconv"
 	"strings"
 )
@@ -155,7 +154,7 @@ func (pr *PrepareRequest) Prepare_body(data *url.Values, files *url.Files, json 
 		byteBuffer, content_type, err = files.Encode()
 		var body_byte []byte
 		if byteBuffer != nil {
-			body_byte, _ = ioutil.ReadAll(byteBuffer)
+			body_byte, _ = io.ReadAll(byteBuffer)
 		}
 		body = string(body_byte)
 		if err != nil {

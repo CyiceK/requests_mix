@@ -30,6 +30,8 @@ var errorFormat = "{\"err\": \"%v\"}"
 var sessionsPool = make(map[string]*sync.Pool)
 var sessionsPoolLock = sync.Mutex{}
 
+var DEFAULT_TIMEOUT = 15 // 默认client响应时间
+
 func GetSession(req libs.RequestParams) *requests.Session {
 	if sp, ok := sessionsPool[req.Id]; ok {
 		s := sp.Get().(*requests.Session)
@@ -48,7 +50,7 @@ func GetSession(req libs.RequestParams) *requests.Session {
 
 	sp := &sync.Pool{
 		New: func() interface{} {
-			s := requests.NewSession(&req)
+			s := requests.NewSession()
 			s.Headers = url.NewHeaders()
 			return s
 		},
@@ -73,6 +75,11 @@ func request(requestParamsChar *C.char) *C.char {
 		return C.CString(fmt.Sprintf(errorFormat, "request->req, err := buildRequest(requestParams) failed: "+err.Error()))
 	}
 
+	if requestParams.Timeout > 0 {
+		GetSession(requestParams).TimeoutPointer = &requestParams.Timeout // share
+	} else {
+		GetSession(requestParams).TimeoutPointer = &DEFAULT_TIMEOUT
+	}
 	response, err := GetSession(requestParams).Request(requestParams.Method, requestParams.Url, req)
 	if err != nil && strings.Contains(err.Error(), "EOF") {
 		// retry 3 times
@@ -83,10 +90,8 @@ func request(requestParamsChar *C.char) *C.char {
 				break
 			}
 		}
-		if err != nil {
-			return C.CString(fmt.Sprintf(errorFormat, "request->response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req) failed: "+err.Error()))
-		}
-	} else if err != nil {
+	}
+	if err != nil {
 		return C.CString(fmt.Sprintf(errorFormat, "request->response, err := GetSession(requestParams.Id).Request(requestParams.Method, requestParams.Url, req) failed: "+err.Error()))
 	}
 
