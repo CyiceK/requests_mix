@@ -1,5 +1,5 @@
 # requests
-[![Gitee link address](https://img.shields.io/badge/gitee-reference-red?logo=gitee&logoColor=red&labelColor=white)](https://gitee.com/leegene/requests)[![Github link address](https://img.shields.io/badge/github-reference-blue?logo=github&logoColor=black&labelColor=white&color=black)](https://github.com/wangluozhe/requests)[![Go Version](https://img.shields.io/badge/Go%20Version-1.20-blue?logo=go&logoColor=white&labelColor=gray)]()[![Release Version](https://img.shields.io/badge/release-v1.2.4-blue)]()[![go documentation](https://img.shields.io/badge/go-documentation-blue)](https://pkg.go.dev/github.com/wangluozhe/requests)[![license GPL-3.0](https://img.shields.io/badge/license-GPL3.0-orange)](https://github.com/wangluozhe/requests/blob/main/LICENSE)
+[![Gitee link address](https://img.shields.io/badge/gitee-reference-red?logo=gitee&logoColor=red&labelColor=white)](https://gitee.com/leegene/requests)[![Github link address](https://img.shields.io/badge/github-reference-blue?logo=github&logoColor=black&labelColor=white&color=black)](https://github.com/CyiceK/requests_mix)[![Go Version](https://img.shields.io/badge/Go%20Version-1.20-blue?logo=go&logoColor=white&labelColor=gray)]()[![Release Version](https://img.shields.io/badge/release-v1.2.4-blue)]()[![go documentation](https://img.shields.io/badge/go-documentation-blue)](https://pkg.go.dev/github.com/CyiceK/requests_mix)[![license GPL-3.0](https://img.shields.io/badge/license-GPL3.0-orange)](https://github.com/CyiceK/requests_mix/blob/main/LICENSE)
 
 requests支持以下新特性：
 
@@ -20,7 +20,7 @@ requests支持以下新特性：
 ## 下载requests库
 
 ```bash
-go get github.com/wangluozhe/requests
+go get github.com/CyiceK/requests_mix
 ```
 
 
@@ -28,7 +28,7 @@ go get github.com/wangluozhe/requests
 ## 下载指定版
 
 ```bash
-go get github.com/wangluozhe/requests@v1.2.4
+go get github.com/CyiceK/requests_mix@v1.2.4
 ```
 
 
@@ -54,8 +54,8 @@ go get github.com/wangluozhe/requests@v1.2.4
 
 ```go
 import (
-    "github.com/wangluozhe/requests"
-    "github.com/wangluozhe/requests/url"
+    "github.com/CyiceK/requests_mix"
+    "github.com/CyiceK/requests_mix/url"
 )
 ```
 
@@ -200,7 +200,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
+	"github.com/CyiceK/requests_mix"
 )
 
 func main() {
@@ -234,7 +234,7 @@ Requests 会自动为你解码 `gzip` 和 `deflate` 以及`br`传输编码的响
 ```go
 package main
 
-import "github.com/wangluozhe/requests"
+import "github.com/CyiceK/requests_mix"
 
 func main(){
     r, err := requests.Get("图片URL", nil)
@@ -260,7 +260,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
+	"github.com/CyiceK/requests_mix"
 )
 
 func main(){
@@ -371,7 +371,7 @@ r, err := requests.Get(rawurl, req)
 package main
 
 import (
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main(){
@@ -412,7 +412,7 @@ func main(){
 package main
 
 import (
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main(){
@@ -544,8 +544,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -654,8 +654,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -787,8 +787,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -913,7 +913,7 @@ panic: runtime error: invalid memory address or nil pointer dereference
 
 goroutine 1 [running]:
 main.main()
-	D:/Go/github.com/wangluozhe/requests/examples/test.go:27 +0xc0
+	D:/Go/github.com/CyiceK/requests_mix/examples/test.go:27 +0xc0
 ```
 
 注意
@@ -933,8 +933,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -1005,10 +1005,10 @@ package main
 
 import (
 	"fmt"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -1104,10 +1104,10 @@ package main
 
 import (
 	"fmt"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -1239,10 +1239,10 @@ package main
 
 import (
 	"fmt"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {
@@ -1356,7 +1356,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {
@@ -1384,7 +1384,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {
@@ -1420,7 +1420,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {
@@ -1465,7 +1465,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {
@@ -1491,7 +1491,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {
@@ -1545,7 +1545,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/wangluozhe/requests/utils"
+	"github.com/CyiceK/requests_mix/utils"
 )
 
 func main() {

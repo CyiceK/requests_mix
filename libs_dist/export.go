@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/chttp/cookiejar"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/libs"
-	ja3 "github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
-	"github.com/wangluozhe/requests/utils"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/chttp-mix/cookiejar"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/libs"
+	ja3 "github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
+	"github.com/CyiceK/requests_mix/utils"
 	url2 "net/url"
 	"strings"
 	"sync"
@@ -75,11 +75,6 @@ func request(requestParamsChar *C.char) *C.char {
 		return C.CString(fmt.Sprintf(errorFormat, "request->req, err := buildRequest(requestParams) failed: "+err.Error()))
 	}
 
-	if requestParams.Timeout > 0 {
-		GetSession(requestParams).TimeoutPointer = &requestParams.Timeout // share
-	} else {
-		GetSession(requestParams).TimeoutPointer = &DEFAULT_TIMEOUT
-	}
 	response, err := GetSession(requestParams).Request(requestParams.Method, requestParams.Url, req)
 	if err != nil && strings.Contains(err.Error(), "EOF") {
 		// retry 3 times

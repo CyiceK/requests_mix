@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CyiceK/chttp-mix"
 	"github.com/bitly/go-simplejson"
-	"github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/requests/url"
+	"github.com/CyiceK/requests_mix/url"
 	"io"
 )
 

@@ -2,7 +2,7 @@ package url
 
 import (
 	"errors"
-	http "github.com/wangluozhe/chttp"
+	http "github.com/CyiceK/chttp-mix"
 	"strconv"
 	"strings"
 )

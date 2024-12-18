@@ -1,9 +1,9 @@
 package transport
 
 import (
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/chttp-mix/http2"
 	utls "github.com/refraction-networking/utls"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/chttp/http2"
 
 	"time"
 

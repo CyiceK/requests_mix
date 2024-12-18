@@ -2,8 +2,8 @@ package url
 
 import (
 	"errors"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/chttp/cookiejar"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/chttp-mix/cookiejar"
 	"net/url"
 	"strconv"
 	"strings"

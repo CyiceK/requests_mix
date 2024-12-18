@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	http "github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/requests"
-	"github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
+	http "github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/requests_mix"
+	"github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
 )
 
 func main() {

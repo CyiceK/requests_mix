@@ -9,15 +9,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/CyiceK/chttp-mix"
+	"github.com/CyiceK/chttp-mix/cookiejar"
+	"github.com/CyiceK/chttp-mix/http2"
+	"github.com/CyiceK/requests_mix/models"
+	ja3 "github.com/CyiceK/requests_mix/transport"
+	"github.com/CyiceK/requests_mix/url"
+	"github.com/CyiceK/requests_mix/utils"
 	"github.com/andybalholm/brotli"
 	utls "github.com/refraction-networking/utls"
-	"github.com/wangluozhe/chttp"
-	"github.com/wangluozhe/chttp/cookiejar"
-	"github.com/wangluozhe/chttp/http2"
-	"github.com/wangluozhe/requests/models"
-	ja3 "github.com/wangluozhe/requests/transport"
-	"github.com/wangluozhe/requests/url"
-	"github.com/wangluozhe/requests/utils"
 	"io"
 	"log"
 	url2 "net/url"
@@ -151,14 +151,13 @@ func NewSession() *Session {
 	DefaultTimeout := DEFAULT_TIMEOUT
 	DefaultRedirectLimit := DEFAULT_REDIRECT_LIMIT
 	session := &Session{
-		Headers:        default_headers(),
-		Cookies:        nil,
-		Verify:         true,
-		MaxRedirects:   DefaultRedirectLimit,
-		transport:      nil,
-		request:        nil,
-		client:         nil,
-		TimeoutPointer: &DefaultTimeout,
+		Headers:      default_headers(),
+		Cookies:      nil,
+		Verify:       true,
+		MaxRedirects: DefaultRedirectLimit,
+		transport:    nil,
+		request:      nil,
+		client:       nil,
 	}
 	cookies, _ := cookiejar.New(nil)
 	session.Cookies = cookies
@@ -180,7 +179,7 @@ func NewSession() *Session {
 		Transport:     session.transport,
 		CheckRedirect: nil,
 		Jar:           cookies,
-		Timeout:       time.Duration(*session.TimeoutPointer) * time.Second,
+		Timeout:       time.Duration(DefaultTimeout) * time.Second,
 	}
 	return session
 }
@@ -207,8 +206,6 @@ type Session struct {
 	request       *http.Request
 	client        *http.Client
 	ja3Hash       [16]byte
-
-	TimeoutPointer *int
 }
 
 // 预请求处理

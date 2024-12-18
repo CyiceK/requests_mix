@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	utls "github.com/refraction-networking/utls"
-	http "github.com/wangluozhe/chttp"
-	http2 "github.com/wangluozhe/chttp/http2"
+	http "github.com/CyiceK/chttp-mix"
+	http2 "github.com/CyiceK/chttp-mix/http2"
 	"golang.org/x/net/proxy"
 )
 
