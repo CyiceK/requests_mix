@@ -66,7 +66,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 
 	//ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
 	//defer cancel()
-	_, err := rt.dialTLS(req.Context(), "tcp", addr)
+	_, err := rt.dialTLS(context.Background(), "tcp", addr)
 	switch err {
 	case errProtocolNegotiated:
 	case nil:
@@ -195,8 +195,8 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 			JA3:              browser.JA3,
 			UserAgent:        browser.UserAgent,
 			Timeout:          timeout,
-			cachedTransports: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-			cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
+			cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+			cachedConnections: gache.New(200).LFU().Expiration().EvictedFunc(func(key interface{}, value interface{}) {
 				err := value.(net.Conn).Close()
 				if err != nil {
 					return
@@ -215,8 +215,8 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		JA3:              browser.JA3,
 		UserAgent:        browser.UserAgent,
 		Timeout:          timeout,
-		cachedTransports: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-		cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
+		cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+		cachedConnections: gache.New(200).LFU().Expiration().EvictedFunc(func(key interface{}, value interface{}) {
 			err := value.(net.Conn).Close()
 			if err != nil {
 				return
