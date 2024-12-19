@@ -4,7 +4,6 @@ import (
 	"github.com/CyiceK/chttp-mix"
 	"github.com/CyiceK/chttp-mix/cookiejar"
 	"github.com/CyiceK/requests_mix/url"
-	"net/http"
 )
 
 type Request struct {
