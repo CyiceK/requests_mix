@@ -23,7 +23,7 @@ type roundTripper struct {
 	// fix typing
 	JA3       string
 	UserAgent string
-	Timeout   int
+	Timeout   int // 无time.Second
 
 	cachedConnections sync.Map
 	cachedTransports  sync.Map
@@ -63,7 +63,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout))
+	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
 	defer cancel()
 	_, err := rt.dialTLS(ctx, "tcp", addr)
 	switch err {
@@ -155,7 +155,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 }
 
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
 	defer cancel()
 	return rt.dialTLS(ctx, network, addr)
 }
