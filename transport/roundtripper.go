@@ -57,7 +57,11 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
-		ts := &http.Transport{DialContext: rt.dialer.DialContext, DisableKeepAlives: true}
+		ts := &http.Transport{
+			DialContext:       rt.dialer.DialContext,
+			DisableKeepAlives: true,
+			IdleConnTimeout:   time.Duration(rt.Timeout) * time.Second,
+		}
 		rt.cachedTransports.Set(addr, ts)
 		return ts, nil
 	case "https":
@@ -67,7 +71,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 
 	//ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
 	//defer cancel()
-	_, err := rt.dialTLS(context.Background(), "tcp", addr)
+	_, err := rt.dialTLS(req.Context(), "tcp", addr)
 	switch err {
 	case errProtocolNegotiated:
 	case nil:
@@ -102,6 +106,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
+		if rawConn != nil {
+			rawConn.Close()
+		}
 		return nil, err
 	}
 
@@ -120,6 +127,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 	tlsConn := utls.UClient(rawConn, rt.config.Clone(), utls.HelloCustom)
 
 	if err := tlsConn.ApplyPreset(spec); err != nil {
+		if tlsConn != nil {
+			tlsConn.Close()
+		}
 		return nil, err
 	}
 
@@ -130,7 +140,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 			//fix this
 			return nil, fmt.Errorf("conn.Handshake() error for tls 1.3 (please retry request): %+v", err)
 		}
-		//return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
+		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 	}
 
 	//////////
@@ -153,9 +163,12 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 		rt.cachedTransports.Set(addr, &t2)
 	default:
 		// Assume the remote peer is speaking HTTP 1.x + TLS.
-		rt.cachedTransports.Set(addr, &http.Transport{DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-			return rt.dialTLS(ctx, network, addr)
-		}})
+		rt.cachedTransports.Set(addr, &http.Transport{
+			DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+				return rt.dialTLS(ctx, network, addr)
+			},
+			IdleConnTimeout: time.Duration(rt.Timeout) * time.Second,
+		})
 
 	}
 
