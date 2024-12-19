@@ -83,7 +83,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
 	rt.Lock()
 	defer rt.Unlock()
-	defer cancel()
+	//defer cancel()
 
 	// If we have the connection from when we determined the HTTPS
 	// cachedTransports to use, return that.
