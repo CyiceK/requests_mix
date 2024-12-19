@@ -64,8 +64,8 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	}
 
 	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
-	defer cancel()
-	_, err := rt.dialTLS(ctx, "tcp", addr)
+	//defer cancel()
+	_, err := rt.dialTLS(ctx, cancel, "tcp", addr)
 	switch err {
 	case errProtocolNegotiated:
 	case nil:
@@ -80,9 +80,10 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	return transport.(http.RoundTripper), nil
 }
 
-func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
 	rt.Lock()
 	defer rt.Unlock()
+	defer cancel()
 
 	// If we have the connection from when we determined the HTTPS
 	// cachedTransports to use, return that.
@@ -156,8 +157,8 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
-	defer cancel()
-	return rt.dialTLS(ctx, network, addr)
+	//defer cancel()
+	return rt.dialTLS(ctx, cancel, network, addr)
 }
 
 func (rt *roundTripper) getDialTLSAddr(req *http.Request) string {
