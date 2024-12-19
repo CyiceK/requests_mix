@@ -196,7 +196,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 			UserAgent:        browser.UserAgent,
 			Timeout:          timeout,
 			cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-			cachedConnections: gache.New(200).LFU().Expiration().EvictedFunc(func(key interface{}, value interface{}) {
+			cachedConnections: gache.New(200).LFU().EvictedFunc(func(key interface{}, value interface{}) {
 				err := value.(net.Conn).Close()
 				if err != nil {
 					return
@@ -216,7 +216,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		UserAgent:        browser.UserAgent,
 		Timeout:          timeout,
 		cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-		cachedConnections: gache.New(200).LFU().Expiration().EvictedFunc(func(key interface{}, value interface{}) {
+		cachedConnections: gache.New(200).LFU().EvictedFunc(func(key interface{}, value interface{}) {
 			err := value.(net.Conn).Close()
 			if err != nil {
 				return
