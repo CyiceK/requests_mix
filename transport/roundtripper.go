@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	http "github.com/CyiceK/chttp-mix"
@@ -18,7 +19,7 @@ import (
 var errProtocolNegotiated = errors.New("protocol negotiated")
 
 type roundTripper struct {
-	//sync.RWMutex
+	sync.RWMutex
 	// fix typing
 	JA3       string
 	UserAgent string
@@ -91,6 +92,13 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 	conn, okErr := rt.cachedConnections.Get(addr)
 	if okErr == nil {
 		return conn.(net.Conn), nil
+	} else {
+		rt.Lock()
+		defer rt.Unlock()
+		conn, okErr = rt.cachedConnections.Get(addr)
+		if okErr == nil {
+			return conn.(net.Conn), nil
+		}
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
@@ -122,7 +130,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 			//fix this
 			return nil, fmt.Errorf("conn.Handshake() error for tls 1.3 (please retry request): %+v", err)
 		}
-		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
+		//return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 	}
 
 	//////////
@@ -196,7 +204,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 			UserAgent:        browser.UserAgent,
 			Timeout:          timeout,
 			cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-			cachedConnections: gache.New(200).LFU().EvictedFunc(func(key interface{}, value interface{}) {
+			cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
 				err := value.(net.Conn).Close()
 				if err != nil {
 					return
@@ -216,7 +224,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		UserAgent:        browser.UserAgent,
 		Timeout:          timeout,
 		cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-		cachedConnections: gache.New(200).LFU().EvictedFunc(func(key interface{}, value interface{}) {
+		cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
 			err := value.(net.Conn).Close()
 			if err != nil {
 				return
