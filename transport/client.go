@@ -33,48 +33,50 @@ func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExten
 }
 
 // newClient creates a new http transport
-func newClient(browser Browser, timeout int, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, proxyURL ...string) (http.Client, error) {
+func newClient(options *Options, proxyURL ...string) (http.Client, error) {
 	//fix check PR
 	if len(proxyURL) > 0 && len(proxyURL[0]) > 0 {
-		dialer, err := newConnectDialer(proxyURL[0], browser.UserAgent)
+		dialer, err := newConnectDialer(proxyURL[0], options.Browser.UserAgent)
 		if err != nil {
 			return http.Client{
-				Timeout: time.Duration(timeout) * time.Second,
+				Timeout: time.Duration(options.Timeout) * time.Second,
 			}, err
 		}
 		return clientBuilder(
-			browser,
-			config,
-			tlsExtensions,
-			http2Settings,
-			forceHTTP1,
+			options.Browser,
+			options.TLSConfig,
+			options.TLSExtensions,
+			options.HTTP2Settings,
+			options.ForceHTTP1,
 			dialer,
-			timeout,
+			options.Timeout,
 		), nil
 	}
 
 	return clientBuilder(
-		browser,
-		config,
-		tlsExtensions,
-		http2Settings,
-		forceHTTP1,
+		options.Browser,
+		options.TLSConfig,
+		options.TLSExtensions,
+		options.HTTP2Settings,
+		options.ForceHTTP1,
 		proxy.Direct,
-		timeout,
+		options.Timeout,
 	), nil
 
 }
 
 type Options struct {
-	Browser       Browser
-	Timeout       int
-	TLSConfig     *utls.Config
-	TLSExtensions *TLSExtensions
-	HTTP2Settings *http2.HTTP2Settings
-	ForceHTTP1    bool
-	Proxy         string
+	Browser         Browser
+	Timeout         int
+	TLSConfig       *utls.Config
+	TLSExtensions   *TLSExtensions
+	HTTP2Settings   *http2.HTTP2Settings
+	ForceHTTP1      bool
+	Proxy           string
+	IdleConnTimeout time.Duration
+	MaxIdleConns    int
 }
 
 func NewClient(options *Options) (http.Client, error) {
-	return newClient(options.Browser, options.Timeout, options.TLSConfig, options.TLSExtensions, options.HTTP2Settings, options.ForceHTTP1, options.Proxy)
+	return newClient(options, options.Proxy)
 }

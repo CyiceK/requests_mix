@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
-
 	"strings"
-	"sync"
+	"time"
 
 	http "github.com/CyiceK/chttp-mix"
 	http2 "github.com/CyiceK/chttp-mix/http2"
+	gache "github.com/bluele/gcache"
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
@@ -19,14 +18,16 @@ import (
 var errProtocolNegotiated = errors.New("protocol negotiated")
 
 type roundTripper struct {
-	sync.RWMutex
+	//sync.RWMutex
 	// fix typing
 	JA3       string
 	UserAgent string
 	Timeout   int // 无time.Second
 
-	cachedConnections sync.Map
-	cachedTransports  sync.Map
+	cachedConnections gache.Cache
+	cachedTransports  gache.Cache
+	// cachedConnections sync.Map
+	//cachedTransports  sync.Map
 
 	dialer        proxy.ContextDialer
 	config        *utls.Config
@@ -48,24 +49,24 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.RoundTripper, error) {
-	transport, ok := rt.cachedTransports.Load(addr)
-	if ok {
+	transport, okErr := rt.cachedTransports.Get(addr)
+	if okErr == nil {
 		return transport.(http.RoundTripper), nil
 	}
 
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
 		ts := &http.Transport{DialContext: rt.dialer.DialContext, DisableKeepAlives: true}
-		rt.cachedTransports.Store(addr, ts)
+		rt.cachedTransports.Set(addr, ts)
 		return ts, nil
 	case "https":
 	default:
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
+	//ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout)*time.Second)
 	//defer cancel()
-	_, err := rt.dialTLS(ctx, cancel, "tcp", addr)
+	_, err := rt.dialTLS(req.Context(), "tcp", addr)
 	switch err {
 	case errProtocolNegotiated:
 	case nil:
@@ -75,20 +76,20 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	default:
 		return nil, err
 	}
-	transport, _ = rt.cachedTransports.Load(addr)
+	transport, _ = rt.cachedTransports.Get(addr)
 
 	return transport.(http.RoundTripper), nil
 }
 
-func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	rt.Lock()
-	defer rt.Unlock()
+func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+	//rt.Lock()
+	//defer rt.Unlock()
 	//defer cancel()
 
 	// If we have the connection from when we determined the HTTPS
 	// cachedTransports to use, return that.
-	conn, ok := rt.cachedConnections.Load(addr)
-	if ok {
+	conn, okErr := rt.cachedConnections.Get(addr)
+	if okErr == nil {
 		return conn.(net.Conn), nil
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
@@ -125,8 +126,8 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	}
 
 	//////////
-	_, ok = rt.cachedTransports.Load(addr)
-	if ok {
+	_, okErr = rt.cachedTransports.Get(addr)
+	if okErr == nil {
 		return tlsConn, nil
 	}
 
@@ -141,26 +142,26 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		if rt.http2Settings != nil {
 			t2.HTTP2Settings = rt.http2Settings
 		}
-		rt.cachedTransports.Store(addr, &t2)
+		rt.cachedTransports.Set(addr, &t2)
 	default:
 		// Assume the remote peer is speaking HTTP 1.x + TLS.
-		rt.cachedTransports.Store(addr, &http.Transport{DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-			return rt.dialTLS(ctx, cancel, network, addr)
+		rt.cachedTransports.Set(addr, &http.Transport{DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+			return rt.dialTLS(ctx, network, addr)
 		}})
 
 	}
 
 	// Stash the connection just established for use servicing the
 	// actual request (should be near-immediate).
-	rt.cachedConnections.Store(addr, tlsConn)
+	rt.cachedConnections.Set(addr, tlsConn)
 
 	return nil, errProtocolNegotiated
 }
 
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
+	//ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
 	//defer cancel()
-	return rt.dialTLS(ctx, cancel, network, addr)
+	return rt.dialTLS(context.Background(), network, addr)
 }
 
 func (rt *roundTripper) getDialTLSAddr(req *http.Request) string {
@@ -191,29 +192,39 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		return &roundTripper{
 			dialer: dialer[0],
 
-			JA3:               browser.JA3,
-			UserAgent:         browser.UserAgent,
-			Timeout:           timeout,
-			cachedTransports:  sync.Map{},
-			cachedConnections: sync.Map{},
-			config:            config,
-			tlsExtensions:     tlsExtensions,
-			http2Settings:     http2Settings,
-			forceHTTP1:        forceHTTP1,
+			JA3:              browser.JA3,
+			UserAgent:        browser.UserAgent,
+			Timeout:          timeout,
+			cachedTransports: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+			cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
+				err := value.(net.Conn).Close()
+				if err != nil {
+					return
+				}
+			}).Build(),
+			config:        config,
+			tlsExtensions: tlsExtensions,
+			http2Settings: http2Settings,
+			forceHTTP1:    forceHTTP1,
 		}
 	}
 
 	return &roundTripper{
 		dialer: proxy.Direct,
 
-		JA3:               browser.JA3,
-		UserAgent:         browser.UserAgent,
-		Timeout:           timeout,
-		cachedTransports:  sync.Map{},
-		cachedConnections: sync.Map{},
-		config:            config,
-		tlsExtensions:     tlsExtensions,
-		http2Settings:     http2Settings,
-		forceHTTP1:        forceHTTP1,
+		JA3:              browser.JA3,
+		UserAgent:        browser.UserAgent,
+		Timeout:          timeout,
+		cachedTransports: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+		cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
+			err := value.(net.Conn).Close()
+			if err != nil {
+				return
+			}
+		}).Build(),
+		config:        config,
+		tlsExtensions: tlsExtensions,
+		http2Settings: http2Settings,
+		forceHTTP1:    forceHTTP1,
 	}
 }

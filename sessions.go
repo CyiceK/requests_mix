@@ -169,8 +169,8 @@ func NewSession() *Session {
 				InsecureSkipVerify: session.Verify,
 				OmitEmptyPsk:       true,
 			},
-			IdleConnTimeout:   2 * time.Second,
-			MaxIdleConns:      50,
+			//IdleConnTimeout:   2 * time.Second,
+			//MaxIdleConns:      50,
 			DisableKeepAlives: false,
 		}
 	})
@@ -206,6 +206,9 @@ type Session struct {
 	request       *http.Request
 	client        *http.Client
 	ja3Hash       [16]byte
+
+	IdleConnTimeout time.Duration
+	MaxIdleConns    int
 }
 
 // 预请求处理
@@ -409,8 +412,6 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 	timeout := req.Timeout
 	if timeout != 0 {
 		s.client.Timeout = timeout
-	} else {
-		s.client.Timeout = 15 * time.Second
 	}
 
 	// http1无需保活
