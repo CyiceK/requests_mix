@@ -133,7 +133,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 		return nil, err
 	}
 
-	if err = tlsConn.HandshakeContext(ctx); err != nil {
+	if err = tlsConn.HandshakeContext(context.Background()); err != nil {
 		_ = tlsConn.Close()
 
 		if err.Error() == "tls: CurvePreferences includes unsupported curve" {
@@ -180,9 +180,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 }
 
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
-	//ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
-	//defer cancel()
-	return rt.dialTLS(context.Background(), network, addr)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout)*time.Second)
+	defer cancel()
+	return rt.dialTLS(ctx, network, addr)
 }
 
 func (rt *roundTripper) getDialTLSAddr(req *http.Request) string {
