@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"strings"
 	"sync"
 
-	utls "github.com/refraction-networking/utls"
 	http "github.com/CyiceK/chttp-mix"
 	http2 "github.com/CyiceK/chttp-mix/http2"
+	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
 
@@ -22,6 +23,7 @@ type roundTripper struct {
 	// fix typing
 	JA3       string
 	UserAgent string
+	Timeout   int
 
 	cachedConnections sync.Map
 	cachedTransports  sync.Map
@@ -61,7 +63,9 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
 	}
 
-	_, err := rt.dialTLS(context.Background(), "tcp", addr)
+	ctx, cancel := context.WithTimeout(req.Context(), time.Duration(rt.Timeout))
+	defer cancel()
+	_, err := rt.dialTLS(ctx, "tcp", addr)
 	switch err {
 	case errProtocolNegotiated:
 	case nil:
@@ -151,7 +155,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, network, addr string) (net.
 }
 
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
-	return rt.dialTLS(context.Background(), network, addr)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(rt.Timeout))
+	defer cancel()
+	return rt.dialTLS(ctx, network, addr)
 }
 
 func (rt *roundTripper) getDialTLSAddr(req *http.Request) string {
@@ -162,7 +168,7 @@ func (rt *roundTripper) getDialTLSAddr(req *http.Request) string {
 	return net.JoinHostPort(req.URL.Host, "443") // we can assume port is 443 at this point
 }
 
-func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, dialer ...proxy.ContextDialer) http.RoundTripper {
+func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, timeout int, dialer ...proxy.ContextDialer) http.RoundTripper {
 	if config == nil {
 		if strings.Index(strings.Split(browser.JA3, ",")[2], "-41") == -1 {
 			config = &utls.Config{
@@ -184,6 +190,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 
 			JA3:               browser.JA3,
 			UserAgent:         browser.UserAgent,
+			Timeout:           timeout,
 			cachedTransports:  sync.Map{},
 			cachedConnections: sync.Map{},
 			config:            config,
@@ -198,6 +205,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 
 		JA3:               browser.JA3,
 		UserAgent:         browser.UserAgent,
+		Timeout:           timeout,
 		cachedTransports:  sync.Map{},
 		cachedConnections: sync.Map{},
 		config:            config,

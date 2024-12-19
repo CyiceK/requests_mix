@@ -26,7 +26,7 @@ func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExten
 		timeout = 15
 	}
 	client := http.Client{
-		Transport: newRoundTripper(browser, config, tlsExtensions, http2Settings, forceHTTP1, dialer),
+		Transport: newRoundTripper(browser, config, tlsExtensions, http2Settings, forceHTTP1, timeout, dialer),
 		Timeout:   time.Duration(timeout) * time.Second,
 	}
 	return client

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/CyiceK/chttp-mix"
-	"github.com/bitly/go-simplejson"
 	"github.com/CyiceK/requests_mix/url"
+	"github.com/bitly/go-simplejson"
 	"io"
 )
 
