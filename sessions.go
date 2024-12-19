@@ -409,6 +409,8 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 	timeout := req.Timeout
 	if timeout != 0 {
 		s.client.Timeout = timeout
+	} else {
+		s.client.Timeout = 15 * time.Second
 	}
 
 	// http1无需保活
