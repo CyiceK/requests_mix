@@ -144,7 +144,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		rt.cachedTransports.Store(addr, &t2)
 	default:
 		// Assume the remote peer is speaking HTTP 1.x + TLS.
-		rt.cachedTransports.Store(addr, &http.Transport{DialTLSContext: rt.dialTLS})
+		rt.cachedTransports.Store(addr, &http.Transport{DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+			return rt.dialTLS(ctx, cancel, network, addr)
+		}})
 
 	}
 
