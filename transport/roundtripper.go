@@ -90,8 +90,8 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	//rt.Lock()
-	//defer rt.Unlock()
+	rt.Lock()
+	defer rt.Unlock()
 	defer cancel()
 
 	// If we have the connection from when we determined the HTTPS
@@ -99,13 +99,13 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	conn, okErr := rt.cachedConnections.Get(addr)
 	if okErr == nil {
 		return conn.(net.Conn), nil
-	} else {
-		rt.Lock()
-		defer rt.Unlock()
-		conn, okErr = rt.cachedConnections.Get(addr)
-		if okErr == nil {
-			return conn.(net.Conn), nil
-		}
+		//} else {
+		//	//rt.Lock()
+		//	//defer rt.Unlock()
+		//	conn, okErr = rt.cachedConnections.Get(addr)
+		//	if okErr == nil {
+		//		return conn.(net.Conn), nil
+		//	}
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
@@ -220,39 +220,29 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		return &roundTripper{
 			dialer: dialer[0],
 
-			JA3:              browser.JA3,
-			UserAgent:        browser.UserAgent,
-			Timeout:          timeout,
-			cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-			cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
-				err := value.(net.Conn).Close()
-				if err != nil {
-					return
-				}
-			}).Build(),
-			config:        config,
-			tlsExtensions: tlsExtensions,
-			http2Settings: http2Settings,
-			forceHTTP1:    forceHTTP1,
+			JA3:               browser.JA3,
+			UserAgent:         browser.UserAgent,
+			Timeout:           timeout,
+			cachedTransports:  gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+			cachedConnections: gache.New(200).LFU().Build(),
+			config:            config,
+			tlsExtensions:     tlsExtensions,
+			http2Settings:     http2Settings,
+			forceHTTP1:        forceHTTP1,
 		}
 	}
 
 	return &roundTripper{
 		dialer: proxy.Direct,
 
-		JA3:              browser.JA3,
-		UserAgent:        browser.UserAgent,
-		Timeout:          timeout,
-		cachedTransports: gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-		cachedConnections: gache.New(200).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, value interface{}) {
-			err := value.(net.Conn).Close()
-			if err != nil {
-				return
-			}
-		}).Build(),
-		config:        config,
-		tlsExtensions: tlsExtensions,
-		http2Settings: http2Settings,
-		forceHTTP1:    forceHTTP1,
+		JA3:               browser.JA3,
+		UserAgent:         browser.UserAgent,
+		Timeout:           timeout,
+		cachedTransports:  gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
+		cachedConnections: gache.New(200).LFU().Build(),
+		config:            config,
+		tlsExtensions:     tlsExtensions,
+		http2Settings:     http2Settings,
+		forceHTTP1:        forceHTTP1,
 	}
 }
