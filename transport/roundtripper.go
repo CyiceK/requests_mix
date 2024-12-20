@@ -98,13 +98,14 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	conn, okErr := rt.cachedConnections.Get(addr)
 	if okErr == nil {
 		return conn.(net.Conn), nil
-		//} else {
-		//	//rt.Lock()
-		//	//defer rt.Unlock()
-		//	conn, okErr = rt.cachedConnections.Get(addr)
-		//	if okErr == nil {
-		//		return conn.(net.Conn), nil
-		//	}
+	} else {
+		rt.Lock()
+		//defer rt.Unlock()
+		conn, okErr = rt.cachedConnections.Get(addr)
+		rt.Unlock()
+		if okErr == nil {
+			return conn.(net.Conn), nil
+		}
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
