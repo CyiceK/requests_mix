@@ -417,9 +417,9 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 	}
 
 	// http1无需保活
-	if req.ForceHTTP1 {
-		req.Headers.Set("Connection", "close")
-	}
+	//if req.ForceHTTP1 {
+	//	req.Headers.Set("Connection", "close")
+	//}
 
 	// 是否自动转发
 	allowRedirect := req.AllowRedirects
