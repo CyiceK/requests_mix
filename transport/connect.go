@@ -94,7 +94,10 @@ func newConnectDialer(proxyURLStr string, UserAgent string, timeout int) (proxy.
 		return nil, errors.New("scheme " + proxyURL.Scheme + " is not supported")
 	}
 
-	client.Dialer = &net.Dialer{}
+	client.Dialer = &net.Dialer{
+		Timeout:  time.Duration(timeout) * time.Second,
+		Deadline: time.Now().Add(time.Duration(timeout) * time.Second),
+	}
 
 	if proxyURL.User != nil {
 		if proxyURL.User.Username() != "" {
