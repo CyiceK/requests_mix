@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/CyiceK/chttp-mix"
 	"github.com/CyiceK/requests_mix/url"
-	"github.com/bitly/go-simplejson"
 	"io"
 )
 
@@ -62,9 +61,9 @@ func (res *Response) Json() (map[string]interface{}, error) {
 }
 
 // 使用go-simplejson解析
-func (res *Response) SimpleJson() (*simplejson.Json, error) {
-	return simplejson.NewFromReader(res.Body)
-}
+//func (res *Response) SimpleJson() (*simplejson.Json, error) {
+//	return simplejson.NewFromReader(res.Body)
+//}
 
 // 状态码是否合格
 func (res Response) Ok() bool {

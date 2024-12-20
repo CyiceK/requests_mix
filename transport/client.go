@@ -36,7 +36,7 @@ func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExten
 func newClient(options *Options, proxyURL ...string) (http.Client, error) {
 	//fix check PR
 	if len(proxyURL) > 0 && len(proxyURL[0]) > 0 {
-		dialer, err := newConnectDialer(proxyURL[0], options.Browser.UserAgent)
+		dialer, err := newConnectDialer(proxyURL[0], options.Browser.UserAgent, options.Timeout)
 		if err != nil {
 			return http.Client{
 				Timeout: time.Duration(options.Timeout) * time.Second,
