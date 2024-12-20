@@ -12,7 +12,6 @@ import (
 
 	http "github.com/CyiceK/chttp-mix"
 	http2 "github.com/CyiceK/chttp-mix/http2"
-	gache "github.com/bluele/gcache"
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
@@ -26,10 +25,8 @@ type roundTripper struct {
 	UserAgent string
 	Timeout   int // 无time.Second
 
-	cachedConnections gache.Cache
-	cachedTransports  gache.Cache
-	// cachedConnections sync.Map
-	//cachedTransports  sync.Map
+	cachedConnections sync.Map
+	cachedTransports  sync.Map
 
 	dialer        proxy.ContextDialer
 	config        *utls.Config
@@ -51,8 +48,8 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.RoundTripper, error) {
-	transport, okErr := rt.cachedTransports.Get(addr)
-	if okErr == nil {
+	transport, okErr := rt.cachedTransports.Load(addr)
+	if okErr {
 		return transport.(http.RoundTripper), nil
 	}
 
@@ -63,7 +60,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 			DisableKeepAlives: true,
 			IdleConnTimeout:   time.Duration(rt.Timeout) * time.Second,
 		}
-		rt.cachedTransports.Set(addr, ts)
+		rt.cachedTransports.Store(addr, ts)
 		return ts, nil
 	case "https":
 	default:
@@ -84,7 +81,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	default:
 		return nil, err
 	}
-	transport, _ = rt.cachedTransports.Get(addr)
+	transport, _ = rt.cachedTransports.Load(addr)
 
 	return transport.(http.RoundTripper), nil
 }
@@ -93,11 +90,12 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	rt.Lock()
 	defer rt.Unlock()
 	defer cancel()
+	defer ctx.Done()
 
 	// If we have the connection from when we determined the HTTPS
 	// cachedTransports to use, return that.
-	conn, okErr := rt.cachedConnections.Get(addr)
-	if okErr == nil {
+	conn, okErr := rt.cachedConnections.Load(addr)
+	if okErr {
 		return conn.(net.Conn), nil
 		//} else {
 		//	//rt.Lock()
@@ -151,8 +149,8 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	}
 
 	//////////
-	_, okErr = rt.cachedTransports.Get(addr)
-	if okErr == nil {
+	_, okErr = rt.cachedTransports.Load(addr)
+	if okErr {
 		return tlsConn, nil
 	}
 
@@ -167,10 +165,10 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		if rt.http2Settings != nil {
 			t2.HTTP2Settings = rt.http2Settings
 		}
-		rt.cachedTransports.Set(addr, &t2)
+		rt.cachedTransports.Store(addr, &t2)
 	default:
 		// Assume the remote peer is speaking HTTP 1.x + TLS.
-		rt.cachedTransports.Set(addr, &http.Transport{
+		rt.cachedTransports.Store(addr, &http.Transport{
 			DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
 				return rt.dialTLS(ctx, cancel, network, addr)
 			},
@@ -181,7 +179,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	// Stash the connection just established for use servicing the
 	// actual request (should be near-immediate).
-	rt.cachedConnections.Set(addr, tlsConn)
+	rt.cachedConnections.Store(addr, tlsConn)
 
 	return nil, errProtocolNegotiated
 }
@@ -223,8 +221,8 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 			JA3:               browser.JA3,
 			UserAgent:         browser.UserAgent,
 			Timeout:           timeout,
-			cachedTransports:  gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-			cachedConnections: gache.New(200).LFU().Build(),
+			cachedTransports:  sync.Map{},
+			cachedConnections: sync.Map{},
 			config:            config,
 			tlsExtensions:     tlsExtensions,
 			http2Settings:     http2Settings,
@@ -238,8 +236,8 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		JA3:               browser.JA3,
 		UserAgent:         browser.UserAgent,
 		Timeout:           timeout,
-		cachedTransports:  gache.New(5).LFU().Expiration(time.Duration(timeout) * time.Second).Build(),
-		cachedConnections: gache.New(200).LFU().Build(),
+		cachedTransports:  sync.Map{},
+		cachedConnections: sync.Map{},
 		config:            config,
 		tlsExtensions:     tlsExtensions,
 		http2Settings:     http2Settings,
