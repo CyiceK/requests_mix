@@ -26,7 +26,7 @@ type connectDialer struct {
 	DefaultHeader http.Header
 
 	Dialer  proxy.ContextDialer // overridden dialer allow to control establishment of TCP connection
-	Timeout int                 // 无time.Second
+	Timeout time.Duration       // 无time.Second
 
 	// overridden DialTLS allows user to control establishment of TLS connection
 	// MUST return connection with completed Handshake, and NegotiatedProtocol
@@ -41,7 +41,7 @@ type connectDialer struct {
 // newConnectDialer creates a dialer to issue CONNECT requests and tunnel traffic via HTTP/S proxy.
 // proxyUrlStr must provide Scheme and Host, may provide credentials and port.
 // Example: https://username:password@golang.org:443
-func newConnectDialer(proxyURLStr string, UserAgent string, timeout int) (proxy.ContextDialer, error) {
+func newConnectDialer(proxyURLStr string, UserAgent string, timeout time.Duration) (proxy.ContextDialer, error) {
 	proxyURL, err := url.Parse(proxyURLStr)
 	if err != nil {
 		return nil, err
@@ -95,8 +95,8 @@ func newConnectDialer(proxyURLStr string, UserAgent string, timeout int) (proxy.
 	}
 
 	client.Dialer = &net.Dialer{
-		Timeout:  time.Duration(timeout) * time.Second,
-		Deadline: time.Now().Add(time.Duration(timeout) * time.Second),
+		Timeout:  timeout,
+		Deadline: time.Now().Add(timeout),
 	}
 
 	if proxyURL.User != nil {
@@ -119,7 +119,7 @@ func newConnectDialer(proxyURLStr string, UserAgent string, timeout int) (proxy.
 }
 
 func (c *connectDialer) Dial(network, address string) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.Timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 	defer cancel()
 	dialContext, err := c.DialContext(ctx, network, address)
 	if err != nil && strings.Contains(err.Error(), "EOF") {
@@ -127,7 +127,7 @@ func (c *connectDialer) Dial(network, address string) (net.Conn, error) {
 		// retry 3 times
 		for i := 0; i < 3; i++ {
 			time.Sleep(time.Millisecond * time.Duration(i) * 100)
-			ctx, cancel = context.WithTimeout(context.Background(), time.Duration(c.Timeout)*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), c.Timeout)
 			defer cancel()
 			dialContext, err = c.DialContext(ctx, network, address)
 			if err == nil {

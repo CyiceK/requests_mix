@@ -20,14 +20,14 @@ var disabledRedirect = func(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
-func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, dialer proxy.ContextDialer, timeout int) http.Client {
+func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, dialer proxy.ContextDialer, timeout time.Duration) http.Client {
 	//if timeout is not set in call default to 15
 	if timeout == 0 {
 		timeout = 15
 	}
 	client := http.Client{
 		Transport: newRoundTripper(browser, config, tlsExtensions, http2Settings, forceHTTP1, timeout, dialer),
-		Timeout:   time.Duration(timeout) * time.Second,
+		Timeout:   timeout,
 	}
 	return client
 }
@@ -39,7 +39,7 @@ func newClient(options *Options, proxyURL ...string) (http.Client, error) {
 		dialer, err := newConnectDialer(proxyURL[0], options.Browser.UserAgent, options.Timeout)
 		if err != nil {
 			return http.Client{
-				Timeout: time.Duration(options.Timeout) * time.Second,
+				Timeout: options.Timeout,
 			}, err
 		}
 		return clientBuilder(
@@ -67,7 +67,7 @@ func newClient(options *Options, proxyURL ...string) (http.Client, error) {
 
 type Options struct {
 	Browser         Browser
-	Timeout         int
+	Timeout         time.Duration
 	TLSConfig       *utls.Config
 	TLSExtensions   *TLSExtensions
 	HTTP2Settings   *http2.HTTP2Settings

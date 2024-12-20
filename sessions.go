@@ -333,6 +333,13 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 		s.transport.Proxy = nil
 	}
 
+	// 设置超时时间
+	timeout := req.Timeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
+	}
+	s.client.Timeout = timeout
+
 	// 设置JA3指纹信息
 	ja3String := merge_setting(s.Ja3, req.Ja3).(string)
 	if ja3String != "" && strings.HasPrefix(preq.Url, "https") {
@@ -360,6 +367,7 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 			HTTP2Settings: http2Settings,
 			ForceHTTP1:    req.ForceHTTP1,
 			TLSConfig:     s.transport.TLSClientConfig,
+			Timeout:       timeout,
 		}
 
 		if proxies != "" {
@@ -406,12 +414,6 @@ func (s *Session) Send(preq *models.PrepareRequest, req *url.Request) (*models.R
 		s.transport.TLSClientConfig.RootCAs = certPool
 		//fmt.Println(certs)
 		s.transport.TLSClientConfig.Certificates = []utls.Certificate{certs}
-	}
-
-	// 设置超时时间
-	timeout := req.Timeout
-	if timeout != 0 {
-		s.client.Timeout = timeout
 	}
 
 	// http1无需保活
