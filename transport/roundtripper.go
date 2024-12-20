@@ -12,6 +12,7 @@ import (
 
 	http "github.com/CyiceK/chttp-mix"
 	http2 "github.com/CyiceK/chttp-mix/http2"
+	gache "github.com/bluele/gcache"
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
@@ -25,8 +26,9 @@ type roundTripper struct {
 	UserAgent string
 	Timeout   int // 无time.Second
 
-	cachedConnections sync.Map
-	cachedTransports  sync.Map
+	cachedConnections gache.Cache
+	//cachedConnections sync.Map
+	cachedTransports sync.Map
 
 	dialer        proxy.ContextDialer
 	config        *utls.Config
@@ -87,15 +89,15 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	rt.Lock()
-	defer rt.Unlock()
+	//rt.Lock()
+	//defer rt.Unlock()
 	defer cancel()
 	defer ctx.Done()
 
 	// If we have the connection from when we determined the HTTPS
 	// cachedTransports to use, return that.
-	conn, okErr := rt.cachedConnections.Load(addr)
-	if okErr {
+	conn, okErr := rt.cachedConnections.Get(addr)
+	if okErr == nil {
 		return conn.(net.Conn), nil
 		//} else {
 		//	//rt.Lock()
@@ -135,22 +137,22 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	}
 
 	if err = tlsConn.HandshakeContext(ctx); err != nil {
-		_ = tlsConn.Close()
-
 		if err.Error() == "tls: CurvePreferences includes unsupported curve" {
+			_ = tlsConn.Close()
 			//fix this
 			return nil, fmt.Errorf("conn.Handshake() error for tls 1.3 (please retry request): %+v", err)
 		} else if err == io.EOF {
 			// 无需处理
 		} else {
+			_ = tlsConn.Close()
 			return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
 		}
 
 	}
 
 	//////////
-	_, okErr = rt.cachedTransports.Load(addr)
-	if okErr {
+	_, ok := rt.cachedTransports.Load(addr)
+	if ok {
 		return tlsConn, nil
 	}
 
@@ -179,7 +181,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	// Stash the connection just established for use servicing the
 	// actual request (should be near-immediate).
-	rt.cachedConnections.Store(addr, tlsConn)
+	rt.cachedConnections.Set(addr, tlsConn)
 
 	return nil, errProtocolNegotiated
 }
@@ -218,29 +220,39 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		return &roundTripper{
 			dialer: dialer[0],
 
-			JA3:               browser.JA3,
-			UserAgent:         browser.UserAgent,
-			Timeout:           timeout,
-			cachedTransports:  sync.Map{},
-			cachedConnections: sync.Map{},
-			config:            config,
-			tlsExtensions:     tlsExtensions,
-			http2Settings:     http2Settings,
-			forceHTTP1:        forceHTTP1,
+			JA3:              browser.JA3,
+			UserAgent:        browser.UserAgent,
+			Timeout:          timeout,
+			cachedTransports: sync.Map{},
+			cachedConnections: gache.New(1).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, v interface{}) {
+				err := v.(net.Conn).Close()
+				if err != nil {
+					return
+				}
+			}).Build(),
+			config:        config,
+			tlsExtensions: tlsExtensions,
+			http2Settings: http2Settings,
+			forceHTTP1:    forceHTTP1,
 		}
 	}
 
 	return &roundTripper{
 		dialer: proxy.Direct,
 
-		JA3:               browser.JA3,
-		UserAgent:         browser.UserAgent,
-		Timeout:           timeout,
-		cachedTransports:  sync.Map{},
-		cachedConnections: sync.Map{},
-		config:            config,
-		tlsExtensions:     tlsExtensions,
-		http2Settings:     http2Settings,
-		forceHTTP1:        forceHTTP1,
+		JA3:              browser.JA3,
+		UserAgent:        browser.UserAgent,
+		Timeout:          timeout,
+		cachedTransports: sync.Map{},
+		cachedConnections: gache.New(1).LFU().Expiration(time.Duration(timeout) * time.Second).EvictedFunc(func(key interface{}, v interface{}) {
+			err := v.(net.Conn).Close()
+			if err != nil {
+				return
+			}
+		}).Build(),
+		config:        config,
+		tlsExtensions: tlsExtensions,
+		http2Settings: http2Settings,
+		forceHTTP1:    forceHTTP1,
 	}
 }
