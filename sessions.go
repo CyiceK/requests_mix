@@ -169,7 +169,7 @@ func NewSession() *Session {
 				InsecureSkipVerify: session.Verify,
 				OmitEmptyPsk:       true,
 			},
-			//IdleConnTimeout:   2 * time.Second,
+			IdleConnTimeout: 30 * time.Second,
 			//MaxIdleConns:      50,
 			DisableKeepAlives: false,
 		}
