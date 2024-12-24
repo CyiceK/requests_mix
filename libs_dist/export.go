@@ -27,31 +27,38 @@ var unsafePointers = make(map[string]*C.char)
 var unsafePointersLock = sync.Mutex{}
 var errorFormat = "{\"err\": \"%v\"}"
 
-var sessionsPool sync.Map
+var sessionsPool = make(map[string]*sync.Pool)
 var sessionsPoolLock = sync.Mutex{}
 
+var DEFAULT_TIMEOUT = 15 // 默认client响应时间
+
 func GetSession(req libs.RequestParams) *requests.Session {
-	if sp, ok := sessionsPool.Load(req.Id); ok {
-		s := sp.(*requests.Session)
+	if sp, ok := sessionsPool[req.Id]; ok {
+		s := sp.Get().(*requests.Session)
+		sp.Put(s)
 		return s
 	}
 
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
 	// heavy lock
-	if sp, ok := sessionsPool.Load(req.Id); ok {
-		s := sp.(*requests.Session)
+	if sp, ok := sessionsPool[req.Id]; ok {
+		s := sp.Get().(*requests.Session)
+		sp.Put(s)
 		return s
 	}
 
-	sp := func() interface{} {
-		s := requests.NewSession()
-		s.Headers = url.NewHeaders()
-		return s
+	sp := &sync.Pool{
+		New: func() interface{} {
+			s := requests.NewSession()
+			s.Headers = url.NewHeaders()
+			return s
+		},
 	}
-	sessionsPool.Store(req.Id, sp)
-	s, _ := sessionsPool.Load(req.Id)
-	return s.(*requests.Session)
+	sessionsPool[req.Id] = sp
+	s := sp.Get().(*requests.Session)
+	sp.Put(s)
+	return s
 }
 
 //export request
