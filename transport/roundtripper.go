@@ -23,7 +23,7 @@ type roundTripper struct {
 	// fix typing
 	JA3       string
 	UserAgent string
-	Timeout   time.Duration // 无time.Second
+	Timeout   time.Duration // time.Second
 
 	cachedConnections gache.Cache
 	//cachedConnections sync.Map
@@ -114,10 +114,10 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		}
 		return nil, err
 	}
-	connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
-	if connErr != nil {
-		return nil, err
-	}
+	//connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
+	//if connErr != nil {
+	//	return nil, err
+	//}
 
 	var host string
 	if host, _, err = net.SplitHostPort(addr); err != nil {
@@ -132,10 +132,10 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	rt.config.ServerName = host
 	tlsConn := utls.UClient(rawConn, rt.config.Clone(), utls.HelloCustom)
-	err = tlsConn.SetDeadline(time.Now().Add(rt.Timeout))
-	if err != nil {
-		return nil, err
-	}
+	//err = tlsConn.SetDeadline(time.Now().Add(rt.Timeout))
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	if err = tlsConn.ApplyPreset(spec); err != nil {
 		if tlsConn != nil {
