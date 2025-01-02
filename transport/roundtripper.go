@@ -108,12 +108,12 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		}
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
-	connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
-	if connErr != nil {
-		return nil, err
-	}
 	if err != nil {
 		rawConn.Close()
+		return nil, err
+	}
+	connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
+	if connErr != nil {
 		return nil, err
 	}
 
@@ -163,8 +163,10 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	switch tlsConn.ConnectionState().NegotiatedProtocol {
 	case http2.NextProtoTLS:
 		t2 := http2.Transport{
-			DialTLS:         rt.dialTLSHTTP2,
-			TLSClientConfig: rt.config,
+			DialTLS:          rt.dialTLSHTTP2,
+			TLSClientConfig:  rt.config,
+			ReadIdleTimeout:  rt.Timeout,
+			WriteByteTimeout: rt.Timeout,
 		}
 		if rt.http2Settings != nil {
 			t2.HTTP2Settings = rt.http2Settings
