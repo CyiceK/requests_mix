@@ -88,25 +88,20 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	//rt.Lock()
-	//defer rt.Unlock()
+	// 确保在访问共享资源时使用锁
+	rt.Lock()
+	defer rt.Unlock()
+
 	defer cancel()
 	defer ctx.Done()
 
-	// If we have the connection from when we determined the HTTPS
-	// cachedTransports to use, return that.
+	// 检查缓存连接
 	conn, okErr := rt.cachedConnections.Get(addr)
 	if okErr == nil {
 		return conn.(net.Conn), nil
-	} else {
-		rt.Lock()
-		//defer rt.Unlock()
-		conn, okErr = rt.cachedConnections.Get(addr)
-		rt.Unlock()
-		if okErr == nil {
-			return conn.(net.Conn), nil
-		}
 	}
+
+	// 建立新的连接
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		if rawConn != nil {
@@ -114,10 +109,6 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		}
 		return nil, err
 	}
-	//connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
-	//if connErr != nil {
-	//	return nil, err
-	//}
 
 	var host string
 	if host, _, err = net.SplitHostPort(addr); err != nil {
@@ -132,10 +123,6 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	rt.config.ServerName = host
 	tlsConn := utls.UClient(rawConn, rt.config.Clone(), utls.HelloCustom)
-	//err = tlsConn.SetDeadline(time.Now().Add(rt.Timeout))
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	if err = tlsConn.ApplyPreset(spec); err != nil {
 		if tlsConn != nil {
@@ -147,11 +134,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	if err = tlsConn.HandshakeContext(ctx); err != nil {
 		_ = tlsConn.Close()
 		if err.Error() == "tls: CurvePreferences includes unsupported curve" {
-			//fix this
 			return nil, fmt.Errorf("conn.Handshake() error for tls 1.3 (please retry request): %+v", err)
 		}
 		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
-
 	}
 
 	//////////
@@ -160,8 +145,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		return tlsConn, nil
 	}
 
-	// No http.Transport constructed yet, create one based on the results
-	// of ALPN.
+	// 根据ALPN结果创建传输
 	switch tlsConn.ConnectionState().NegotiatedProtocol {
 	case http2.NextProtoTLS:
 		t2 := http2.Transport{
@@ -182,13 +166,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 			},
 			IdleConnTimeout: rt.Timeout,
 		})
-
 	}
 
-	// Stash the connection just established for use servicing the
-	// actual request (should be near-immediate).
-	rt.Lock()
-	defer rt.Unlock()
+	// 缓存新的连接
 	if rt.cachedConnections.Has(addr) {
 		conn, okErr = rt.cachedConnections.Get(addr)
 		if okErr == nil {
@@ -202,7 +182,6 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	return nil, errProtocolNegotiated
 }
-
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
 	//defer cancel()
