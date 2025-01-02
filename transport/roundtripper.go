@@ -27,7 +27,7 @@ type roundTripper struct {
 
 	cachedConnections gache.Cache
 	//cachedConnections sync.Map
-	cachedTransports sync.Map
+	//cachedTransports sync.Map
 
 	dialer        proxy.ContextDialer
 	config        *utls.Config
@@ -49,20 +49,18 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.RoundTripper, error) {
-	transport, okErr := rt.cachedTransports.Load(addr)
-	if okErr {
-		return transport.(http.RoundTripper), nil
-	}
-
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
-		ts := &http.Transport{
+		//ts := &http.Transport{
+		//	DialContext:       rt.dialer.DialContext,
+		//	DisableKeepAlives: true,
+		//	IdleConnTimeout:   rt.Timeout,
+		//}
+		return &http.Transport{
 			DialContext:       rt.dialer.DialContext,
 			DisableKeepAlives: true,
 			IdleConnTimeout:   rt.Timeout,
-		}
-		rt.cachedTransports.Store(addr, ts)
-		return ts, nil
+		}, nil
 	case "https":
 	default:
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
@@ -72,19 +70,7 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	ctx, cancel := context.WithTimeout(req.Context(), rt.Timeout)
 	//defer cancel()
 	_, err := rt.dialTLS(ctx, cancel, "tcp", addr)
-
-	switch {
-	case errors.Is(err, errProtocolNegotiated):
-	case err == nil:
-		// Should never happen.
-		//panic("dialTLS returned no error when determining cachedTransports")
-		return nil, fmt.Errorf("dialTLS returned no error when determining cachedTransports")
-	default:
-		return nil, err
-	}
-	transport, _ = rt.cachedTransports.Load(addr)
-
-	return transport.(http.RoundTripper), nil
+	return nil, err
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
@@ -92,7 +78,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	rt.Lock()
 	defer rt.Unlock()
 
-	defer cancel()
+	//defer cancel()
 	defer ctx.Done()
 
 	// 检查缓存连接
@@ -118,6 +104,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	spec, err := StringToSpec(rt.JA3, rt.UserAgent, rt.tlsExtensions, rt.forceHTTP1)
 	if err != nil {
+		rawConn.Close() // 确保在错误时关闭连接
 		return nil, err
 	}
 
@@ -140,33 +127,6 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	}
 
 	//////////
-	_, ok := rt.cachedTransports.Load(addr)
-	if ok {
-		return tlsConn, nil
-	}
-
-	// 根据ALPN结果创建传输
-	switch tlsConn.ConnectionState().NegotiatedProtocol {
-	case http2.NextProtoTLS:
-		t2 := http2.Transport{
-			DialTLS:          rt.dialTLSHTTP2,
-			TLSClientConfig:  rt.config,
-			ReadIdleTimeout:  rt.Timeout,
-			WriteByteTimeout: rt.Timeout,
-		}
-		if rt.http2Settings != nil {
-			t2.HTTP2Settings = rt.http2Settings
-		}
-		rt.cachedTransports.Store(addr, &t2)
-	default:
-		// Assume the remote peer is speaking HTTP 1.x + TLS.
-		rt.cachedTransports.Store(addr, &http.Transport{
-			DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-				return rt.dialTLS(ctx, cancel, network, addr)
-			},
-			IdleConnTimeout: rt.Timeout,
-		})
-	}
 
 	// 缓存新的连接
 	if rt.cachedConnections.Has(addr) {
@@ -174,14 +134,15 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 		if okErr == nil {
 			err = conn.(net.Conn).Close()
 			if err != nil {
+				tlsConn.Close() // 确保在错误时关闭新建立的连接
 				return nil, err
 			}
 		}
 	}
 	rt.cachedConnections.Set(addr, tlsConn)
-
-	return nil, errProtocolNegotiated
+	return tlsConn, nil
 }
+
 func (rt *roundTripper) dialTLSHTTP2(network, addr string, _ *utls.Config) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
 	//defer cancel()
@@ -216,11 +177,11 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		return &roundTripper{
 			dialer: dialer[0],
 
-			JA3:              browser.JA3,
-			UserAgent:        browser.UserAgent,
-			Timeout:          timeout,
-			cachedTransports: sync.Map{},
-			cachedConnections: gache.New(10).LFU().Expiration(timeout).EvictedFunc(func(key interface{}, v interface{}) {
+			JA3:       browser.JA3,
+			UserAgent: browser.UserAgent,
+			Timeout:   timeout,
+			//cachedTransports: sync.Map{},
+			cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
 				err := v.(net.Conn).Close()
 				if err != nil {
 					return
@@ -236,11 +197,11 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 	return &roundTripper{
 		dialer: proxy.Direct,
 
-		JA3:              browser.JA3,
-		UserAgent:        browser.UserAgent,
-		Timeout:          timeout,
-		cachedTransports: sync.Map{},
-		cachedConnections: gache.New(10).LFU().Expiration(timeout).EvictedFunc(func(key interface{}, v interface{}) {
+		JA3:       browser.JA3,
+		UserAgent: browser.UserAgent,
+		Timeout:   timeout,
+		//cachedTransports: sync.Map{},
+		cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
 			err := v.(net.Conn).Close()
 			if err != nil {
 				return
