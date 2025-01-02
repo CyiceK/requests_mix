@@ -23,7 +23,7 @@ var disabledRedirect = func(req *http.Request, via []*http.Request) error {
 func clientBuilder(browser Browser, config *utls.Config, tlsExtensions *TLSExtensions, http2Settings *http2.HTTP2Settings, forceHTTP1 bool, dialer proxy.ContextDialer, timeout time.Duration) http.Client {
 	//if timeout is not set in call default to 15
 	if timeout == 0 {
-		timeout = 15
+		timeout = 15 * time.Second
 	}
 	client := http.Client{
 		Transport: newRoundTripper(browser, config, tlsExtensions, http2Settings, forceHTTP1, timeout, dialer),

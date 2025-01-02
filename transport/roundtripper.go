@@ -109,7 +109,9 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
 	if err != nil {
-		rawConn.Close()
+		if rawConn != nil {
+			rawConn.Close()
+		}
 		return nil, err
 	}
 	connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
