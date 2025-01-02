@@ -130,7 +130,6 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	rt.config.ServerName = host
 	tlsConn := utls.UClient(rawConn, rt.config.Clone(), utls.HelloCustom)
-
 	if err = tlsConn.ApplyPreset(spec); err != nil {
 		if tlsConn != nil {
 			tlsConn.Close()
@@ -144,6 +143,11 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 			return nil, fmt.Errorf("conn.Handshake() error for tls 1.3 (please retry request): %+v", err)
 		}
 		return nil, fmt.Errorf("uTlsConn.Handshake() error: %+v", err)
+	}
+
+	err = tlsConn.SetDeadline(time.Now().Add(rt.Timeout))
+	if err != nil {
+		return nil, err
 	}
 
 	//////////
