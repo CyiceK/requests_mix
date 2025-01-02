@@ -88,8 +88,8 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	rt.Lock()
-	defer rt.Unlock()
+	//rt.Lock()
+	//defer rt.Unlock()
 	defer cancel()
 	defer ctx.Done()
 
@@ -99,19 +99,21 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 	if okErr == nil {
 		return conn.(net.Conn), nil
 	} else {
-		//rt.Lock()
+		rt.Lock()
 		//defer rt.Unlock()
 		conn, okErr = rt.cachedConnections.Get(addr)
-		//rt.Unlock()
+		rt.Unlock()
 		if okErr == nil {
 			return conn.(net.Conn), nil
 		}
 	}
 	rawConn, err := rt.dialer.DialContext(ctx, network, addr)
+	connErr := rawConn.SetDeadline(time.Now().Add(rt.Timeout))
+	if connErr != nil {
+		return nil, err
+	}
 	if err != nil {
-		if rawConn != nil {
-			rawConn.Close()
-		}
+		rawConn.Close()
 		return nil, err
 	}
 
@@ -128,8 +130,12 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	rt.config.ServerName = host
 	tlsConn := utls.UClient(rawConn, rt.config.Clone(), utls.HelloCustom)
+	err = tlsConn.SetDeadline(time.Now().Add(rt.Timeout))
+	if err != nil {
+		return nil, err
+	}
 
-	if err := tlsConn.ApplyPreset(spec); err != nil {
+	if err = tlsConn.ApplyPreset(spec); err != nil {
 		if tlsConn != nil {
 			tlsConn.Close()
 		}
@@ -177,8 +183,8 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	// Stash the connection just established for use servicing the
 	// actual request (should be near-immediate).
-	//rt.Lock()
-	//defer rt.Unlock()
+	rt.Lock()
+	defer rt.Unlock()
 	if rt.cachedConnections.Has(addr) {
 		conn, okErr = rt.cachedConnections.Get(addr)
 		if okErr == nil {
