@@ -88,8 +88,8 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
-	//rt.Lock()
-	//defer rt.Unlock()
+	rt.Lock()
+	defer rt.Unlock()
 	defer cancel()
 	defer ctx.Done()
 
@@ -177,8 +177,8 @@ func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, 
 
 	// Stash the connection just established for use servicing the
 	// actual request (should be near-immediate).
-	rt.Lock()
-	defer rt.Unlock()
+	//rt.Lock()
+	//defer rt.Unlock()
 	if rt.cachedConnections.Has(addr) {
 		conn, okErr = rt.cachedConnections.Get(addr)
 		if okErr == nil {
