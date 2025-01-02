@@ -70,7 +70,27 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	ctx, cancel := context.WithTimeout(req.Context(), rt.Timeout)
 	//defer cancel()
 	_, err := rt.dialTLS(ctx, cancel, "tcp", addr)
-	return nil, err
+	if rt.forceHTTP1 {
+		return &http.Transport{
+			DialContext: rt.dialer.DialContext,
+			DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+				return rt.dialTLS(ctx, cancel, network, addr)
+			},
+			IdleConnTimeout: rt.Timeout,
+		}, err
+	} else {
+		var http2Settings *http2.HTTP2Settings
+		if rt.http2Settings != nil {
+			http2Settings = rt.http2Settings
+		} else {
+			http2Settings = nil
+		}
+		return &http2.Transport{
+			DialTLS:         rt.dialTLSHTTP2,
+			TLSClientConfig: rt.config,
+			HTTP2Settings:   http2Settings,
+		}, err
+	}
 }
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
