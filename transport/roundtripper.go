@@ -26,9 +26,10 @@ type roundTripper struct {
 	UserAgent string
 	Timeout   time.Duration // time.Second
 
-	cachedConnections      gache.Cache
-	cachedTransports       cmap.ConcurrentMap[string, http.RoundTripper]
-	cachedTransportsLocker sync.Mutex
+	cachedConnections         gache.Cache
+	cachedTransports          cmap.ConcurrentMap[string, http.RoundTripper]
+	perCachedTransportsLocker sync.Mutex
+	cachedTransportsLocker    sync.Mutex
 	//cachedConnections sync.Map
 	//cachedTransports sync.Map
 
@@ -56,8 +57,7 @@ func (rt *roundTripper) storeTs(addr string, ts any) {
 	defer rt.cachedTransportsLocker.Unlock()
 	if rt.cachedTransports.Has(addr) {
 		return
-	}
-	if trH2, ok := ts.(*http2.Transport); ok {
+	} else if trH2, ok := ts.(*http2.Transport); ok {
 		rt.cachedTransports.Set(addr, trH2)
 	} else if trH1, ok := ts.(*http.Transport); ok {
 		rt.cachedTransports.Set(addr, trH1)
@@ -70,6 +70,13 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 	if tr, existTr := rt.cachedTransports.Get(addr); existTr {
 		return tr, nil
 	}
+
+	rt.perCachedTransportsLocker.Lock()
+	defer rt.perCachedTransportsLocker.Unlock()
+	if tr, existTr := rt.cachedTransports.Get(addr); existTr {
+		return tr, nil
+	}
+
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
 		ts := &http.Transport{
@@ -101,7 +108,6 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 			}
 			rt.storeTs(addr, ts)
 			return ts, nil
-
 		}
 	default:
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
