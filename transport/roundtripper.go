@@ -20,7 +20,7 @@ import (
 var errProtocolNegotiated = errors.New("protocol negotiated")
 
 type roundTripper struct {
-	sync.RWMutex
+	rt sync.RWMutex
 	// fix typing
 	JA3       string
 	UserAgent string
@@ -127,8 +127,8 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 
 func (rt *roundTripper) dialTLS(ctx context.Context, cancel context.CancelFunc, network, addr string) (net.Conn, error) {
 	// 确保在访问共享资源时使用锁
-	rt.Lock()
-	defer rt.Unlock()
+	rt.rt.Lock()
+	defer rt.rt.Unlock()
 
 	//defer cancel()
 	defer ctx.Done()
@@ -237,7 +237,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 			UserAgent:        browser.UserAgent,
 			Timeout:          timeout,
 			cachedTransports: cmap.New[http.RoundTripper](),
-			cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
+			cachedConnections: gache.New(10).LFU().Expiration(timeout).EvictedFunc(func(key interface{}, v interface{}) {
 				err := v.(net.Conn).Close()
 				if err != nil {
 					return
@@ -257,7 +257,7 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		UserAgent:        browser.UserAgent,
 		Timeout:          timeout,
 		cachedTransports: cmap.New[http.RoundTripper](),
-		cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
+		cachedConnections: gache.New(10).LFU().Expiration(timeout).EvictedFunc(func(key interface{}, v interface{}) {
 			err := v.(net.Conn).Close()
 			if err != nil {
 				return
