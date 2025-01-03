@@ -29,21 +29,32 @@ var unsafePointers = cmap.New[*C.char]()
 // var unsafePointersLock = sync.Mutex{}
 var errorFormat = "{\"err\": \"%v\"}"
 
-var sessionsPool = cmap.New[*requests.Session]()
+var sessionsPool = cmap.New[*sync.Pool]()
 var sessionsPoolLock = sync.Mutex{}
 
 func GetSession(req libs.RequestParams) *requests.Session {
 	if sp, ok := sessionsPool.Get(req.Id); ok {
-		return sp
+		s := sp.Get().(*requests.Session)
+		sp.Put(s)
+		return s
 	}
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
 	if sp, ok := sessionsPool.Get(req.Id); ok {
-		return sp
+		s := sp.Get().(*requests.Session)
+		sp.Put(s)
+		return s
 	}
-	s := requests.NewSession()
-	s.Headers = url.NewHeaders()
-	sessionsPool.Set(req.Id, s)
+	sp := &sync.Pool{
+		New: func() interface{} {
+			s := requests.NewSession()
+			s.Headers = url.NewHeaders()
+			return s
+		},
+	}
+	sessionsPool.Set(req.Id, sp)
+	s := sp.Get().(*requests.Session)
+	sp.Put(s)
 	return s
 }
 
