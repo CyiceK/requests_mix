@@ -92,33 +92,16 @@ func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.Round
 			rt.storeTs(addr, ts)
 			return ts, nil
 		} else {
-			switch req.Proto {
-			case "HTTP/2.0":
-				var http2Settings *http2.HTTP2Settings
-				if rt.http2Settings != nil {
-					http2Settings = rt.http2Settings
-				} else {
-					http2Settings = nil
-				}
-				ts := &http2.Transport{
-					DialTLS:         rt.dialTLSHTTP2,
-					TLSClientConfig: rt.config,
-					HTTP2Settings:   http2Settings,
-				}
-				rt.storeTs(addr, ts)
-				return ts, nil
-			default: // "HTTP/1.1" "HTTP/1.0"
-				ts := &http.Transport{
-					DialContext: rt.dialer.DialContext,
-					DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-						newCtx, cancel := context.WithTimeout(ctx, rt.Timeout)
-						return rt.dialTLS(newCtx, cancel, network, addr)
-					},
-					IdleConnTimeout: rt.Timeout,
-				}
-				rt.storeTs(addr, ts)
-				return ts, nil
+			ts := &http2.Transport{
+				DialTLS:         rt.dialTLSHTTP2,
+				TLSClientConfig: rt.config,
 			}
+			if rt.http2Settings != nil {
+				ts.HTTP2Settings = rt.http2Settings
+			}
+			rt.storeTs(addr, ts)
+			return ts, nil
+
 		}
 	default:
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
