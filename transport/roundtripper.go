@@ -12,6 +12,7 @@ import (
 	http "github.com/CyiceK/chttp-mix"
 	http2 "github.com/CyiceK/chttp-mix/http2"
 	gache "github.com/bluele/gcache"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
@@ -25,7 +26,9 @@ type roundTripper struct {
 	UserAgent string
 	Timeout   time.Duration // time.Second
 
-	cachedConnections gache.Cache
+	cachedConnections      gache.Cache
+	cachedTransports       cmap.ConcurrentMap[string, http.RoundTripper]
+	cachedTransportsLocker sync.Mutex
 	//cachedConnections sync.Map
 	//cachedTransports sync.Map
 
@@ -48,48 +51,77 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return transport.RoundTrip(req)
 }
 
+func (rt *roundTripper) storeTs(addr string, ts any) {
+	rt.cachedTransportsLocker.Lock()
+	defer rt.cachedTransportsLocker.Unlock()
+	if rt.cachedTransports.Has(addr) {
+		return
+	}
+	if trH2, ok := ts.(*http2.Transport); ok {
+		rt.cachedTransports.Set(addr, trH2)
+	} else if trH1, ok := ts.(*http.Transport); ok {
+		rt.cachedTransports.Set(addr, trH1)
+	} else {
+		return
+	}
+}
+
 func (rt *roundTripper) getTransport(req *http.Request, addr string) (http.RoundTripper, error) {
+	if tr, existTr := rt.cachedTransports.Get(addr); existTr {
+		return tr, nil
+	}
 	switch strings.ToLower(req.URL.Scheme) {
 	case "http":
-		//ts := &http.Transport{
-		//	DialContext:       rt.dialer.DialContext,
-		//	DisableKeepAlives: true,
-		//	IdleConnTimeout:   rt.Timeout,
-		//}
-		return &http.Transport{
+		ts := &http.Transport{
 			DialContext:       rt.dialer.DialContext,
 			DisableKeepAlives: true,
 			IdleConnTimeout:   rt.Timeout,
-		}, nil
+		}
+		rt.storeTs(addr, ts)
+		return ts, nil
 	case "https":
+		if rt.forceHTTP1 {
+			ts := &http.Transport{
+				DialContext: rt.dialer.DialContext,
+				DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+					newCtx, cancel := context.WithTimeout(ctx, rt.Timeout)
+					return rt.dialTLS(newCtx, cancel, network, addr)
+				},
+				IdleConnTimeout: rt.Timeout,
+			}
+			rt.storeTs(addr, ts)
+			return ts, nil
+		} else {
+			switch req.Proto {
+			case "HTTP/2.0":
+				var http2Settings *http2.HTTP2Settings
+				if rt.http2Settings != nil {
+					http2Settings = rt.http2Settings
+				} else {
+					http2Settings = nil
+				}
+				ts := &http2.Transport{
+					DialTLS:         rt.dialTLSHTTP2,
+					TLSClientConfig: rt.config,
+					HTTP2Settings:   http2Settings,
+				}
+				rt.storeTs(addr, ts)
+				return ts, nil
+			default: // "HTTP/1.1" "HTTP/1.0"
+				ts := &http.Transport{
+					DialContext: rt.dialer.DialContext,
+					DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+						newCtx, cancel := context.WithTimeout(ctx, rt.Timeout)
+						return rt.dialTLS(newCtx, cancel, network, addr)
+					},
+					IdleConnTimeout: rt.Timeout,
+				}
+				rt.storeTs(addr, ts)
+				return ts, nil
+			}
+		}
 	default:
 		return nil, fmt.Errorf("invalid URL scheme: [%v]", req.URL.Scheme)
-	}
-
-	// TODO: 此处有连接泄漏的问题
-	ctx, cancel := context.WithTimeout(req.Context(), rt.Timeout)
-	//defer cancel()
-	_, err := rt.dialTLS(ctx, cancel, "tcp", addr)
-	if rt.forceHTTP1 {
-		return &http.Transport{
-			DialContext: rt.dialer.DialContext,
-			DialTLSContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
-				return rt.dialTLS(ctx, cancel, network, addr)
-			},
-			IdleConnTimeout: rt.Timeout,
-		}, err
-	} else {
-		var http2Settings *http2.HTTP2Settings
-		if rt.http2Settings != nil {
-			http2Settings = rt.http2Settings
-		} else {
-			http2Settings = nil
-		}
-		return &http2.Transport{
-			DialTLS:         rt.dialTLSHTTP2,
-			TLSClientConfig: rt.config,
-			HTTP2Settings:   http2Settings,
-		}, err
 	}
 }
 
@@ -201,10 +233,10 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 		return &roundTripper{
 			dialer: dialer[0],
 
-			JA3:       browser.JA3,
-			UserAgent: browser.UserAgent,
-			Timeout:   timeout,
-			//cachedTransports: sync.Map{},
+			JA3:              browser.JA3,
+			UserAgent:        browser.UserAgent,
+			Timeout:          timeout,
+			cachedTransports: cmap.New[http.RoundTripper](),
 			cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
 				err := v.(net.Conn).Close()
 				if err != nil {
@@ -221,10 +253,10 @@ func newRoundTripper(browser Browser, config *utls.Config, tlsExtensions *TLSExt
 	return &roundTripper{
 		dialer: proxy.Direct,
 
-		JA3:       browser.JA3,
-		UserAgent: browser.UserAgent,
-		Timeout:   timeout,
-		//cachedTransports: sync.Map{},
+		JA3:              browser.JA3,
+		UserAgent:        browser.UserAgent,
+		Timeout:          timeout,
+		cachedTransports: cmap.New[http.RoundTripper](),
 		cachedConnections: gache.New(10).LFU().Expiration(time.Second * 3).EvictedFunc(func(key interface{}, v interface{}) {
 			err := v.(net.Conn).Close()
 			if err != nil {

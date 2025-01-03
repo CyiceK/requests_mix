@@ -7,6 +7,7 @@ require (
 	github.com/andybalholm/brotli v1.1.1
 	github.com/bluele/gcache v0.0.2
 	github.com/google/uuid v1.6.0
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/refraction-networking/utls v1.6.7
 	golang.org/x/crypto v0.31.0
 	golang.org/x/net v0.33.0
