@@ -16,6 +16,7 @@ import (
 	"github.com/CyiceK/requests_mix/url"
 	"github.com/CyiceK/requests_mix/utils"
 	"github.com/google/uuid"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	url2 "net/url"
 	"strings"
 	"sync"
@@ -23,31 +24,26 @@ import (
 	"unsafe"
 )
 
-var unsafePointers = make(map[string]*C.char)
-var unsafePointersLock = sync.Mutex{}
+var unsafePointers = cmap.New[*C.char]()
+
+// var unsafePointersLock = sync.Mutex{}
 var errorFormat = "{\"err\": \"%v\"}"
 
-var sessionsPool = make(map[string]*sync.Pool)
+var sessionsPool = cmap.New[*requests.Session]()
 var sessionsPoolLock = sync.Mutex{}
 
 func GetSession(req libs.RequestParams) *requests.Session {
+	if sp, ok := sessionsPool.Get(req.Id); ok {
+		return sp
+	}
 	sessionsPoolLock.Lock()
 	defer sessionsPoolLock.Unlock()
-	if sp, ok := sessionsPool[req.Id]; ok {
-		s := sp.Get().(*requests.Session)
-		sp.Put(s)
-		return s
+	if sp, ok := sessionsPool.Get(req.Id); ok {
+		return sp
 	}
-	sp := &sync.Pool{
-		New: func() interface{} {
-			s := requests.NewSession()
-			s.Headers = url.NewHeaders()
-			return s
-		},
-	}
-	sessionsPool[req.Id] = sp
-	s := sp.Get().(*requests.Session)
-	sp.Put(s)
+	s := requests.NewSession()
+	s.Headers = url.NewHeaders()
+	sessionsPool.Set(req.Id, s)
 	return s
 }
 
@@ -94,9 +90,9 @@ func request(requestParamsChar *C.char) *C.char {
 	}
 	responseString := C.CString(string(responseParamsString))
 
-	unsafePointersLock.Lock()
-	unsafePointers[responseParams["id"].(string)] = responseString
-	defer unsafePointersLock.Unlock()
+	//unsafePointersLock.Lock()
+	unsafePointers.Set(responseParams["id"].(string), responseString)
+	//defer unsafePointersLock.Unlock()
 
 	return responseString
 }
@@ -230,10 +226,10 @@ func buildRequest(requestParams libs.RequestParams) (*url.Request, error) {
 func freeMemory(responseId *C.char) {
 	responseIdString := C.GoString(responseId)
 
-	unsafePointersLock.Lock()
-	defer unsafePointersLock.Unlock()
+	//unsafePointersLock.Lock()
+	//defer unsafePointersLock.Unlock()
 
-	ptr, ok := unsafePointers[responseIdString]
+	ptr, ok := unsafePointers.Get(responseIdString)
 
 	if !ok {
 		fmt.Println("freeMemory:", ok)
@@ -244,7 +240,7 @@ func freeMemory(responseId *C.char) {
 		defer C.free(unsafe.Pointer(ptr))
 	}
 
-	delete(unsafePointers, responseIdString)
+	unsafePointers.Remove(responseIdString)
 }
 
 func main() {
